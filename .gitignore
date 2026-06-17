@@ -1,0 +1,15 @@
+.env
+
+/generated/prisma
+
+.secret
+
+pkey.js
+
+keystore/
+
+node_modules/
+
+wrangler.toml
+
+capitalManager/.env

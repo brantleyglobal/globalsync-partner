@@ -1,0 +1,83 @@
+name: Build and Release Electron App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # PHASE 1: Safely initialize the Release landing pad using GitHub's native tools
+  create-release:
+    name: Initialize GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out git repository
+        uses: actions/checkout@v4
+
+      - name: Create Release Placeholder
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # PHASE 2: Run the multi-platform builders and upload the files
+  release:
+    name: Build for ${{ matrix.os }}
+    needs: create-release # ◄ Tells the builders to wait for Phase 1 to finish completely
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    steps:
+      - name: Check out git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: 'yarn'
+
+      - name: Force Git to use HTTPS instead of SSH
+        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run Vite Production Build
+        run: yarn build
+
+      # LINUX PUBLISH
+      - name: Compile and Publish via Electron Forge (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" yarn run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISABLE_ELECTRON_SANDBOX: 1
+          ELECTRON_RUN_AS_NODE: 1
+
+      # WINDOWS PUBLISH
+      - name: Compile and Publish via Electron Forge (Windows)
+        if: matrix.os == 'windows-latest'
+        run: yarn run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISABLE_ELECTRON_SANDBOX: 1
+          ELECTRON_RUN_AS_NODE: 1
+          ELECTRON_DISABLE_GPU: 1
+
+      # MAC PUBLISH
+      - name: Compile and Publish via Electron Forge (Mac)
+        if: matrix.os == 'macos-latest'
+        run: yarn run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

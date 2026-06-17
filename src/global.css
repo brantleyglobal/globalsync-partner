@@ -1,0 +1,47 @@
+/* ==========================================
+   GLOBAL CONFIG & MODERN SCROLLBARS
+   ========================================== */
+
+/* 1. Reset defaults for a seamless dark theme application */
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #0a0a0a; /* Matches your dashboard's deep dark background */
+  color: #e5e5e5;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* 2. Modern Standards (Firefox) */
+html {
+  scrollbar-color: #2a2a2a #0d0d0d;
+  scrollbar-width: thin;
+}
+
+/* 3. WebKit Browsers (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 8px;  /* Sleek, thin vertical scrollbar */
+  height: 8px; /* Horizontal scrollbar */
+}
+
+/* Scrollbar Track background */
+::-webkit-scrollbar-track {
+  background: #0d0d0d; 
+  border-left: 1px solid #141414;
+}
+
+/* The actual draggable scroll handle */
+::-webkit-scrollbar-thumb {
+  background: #222222; 
+  border-radius: 4px;
+  border: 1px solid #1a1a1a;
+  transition: background 0.15s ease;
+}
+
+/* Glow-accent when hovering over the scrollbar */
+::-webkit-scrollbar-thumb:hover {
+  background: #4ade80; /* Your signature Forest Green accent */
+}
+
+::-webkit-scrollbar-corner {
+  background: #0d0d0d;
+}
