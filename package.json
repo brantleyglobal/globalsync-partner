@@ -136,14 +136,14 @@
     "description": "GlobalSync decentralized operations and capital manager dashboard.",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/brantleyglobal/globalsync.git"
+        "url": "git+https://github.com/brantleyglobal/globalsync-partner.git"
     },
     "keywords": [],
     "author": "Brantley Global",
     "license": "ISC",
     "bugs": {
-        "url": "https://github.com/brantleyglobal/globalsync/issues"
+        "url": "https://github.com/brantleyglobal/globalsync-partner/issues"
     },
-    "homepage": "https://github.com/brantleyglobal/globalsync#readme",
+    "homepage": "https://github.com/brantleyglobal/globalsync-partner#readme",
     "packageManager": "yarn@1.22.22"
 }
