@@ -119,7 +119,18 @@
                     "config": {}
                 }
             ],
-            "publishers": []
+            "publishers": [
+                {
+                    "name": "@electron-forge/publisher-github",
+                    "config": {
+                        "repository": {
+                            "owner": "brantleyglobal",
+                            "name": "globalsync-partner"
+                        },
+                        "draft": true
+                    }
+                }
+            ]
         }
     },
     "description": "GlobalSync decentralized operations and capital manager dashboard.",

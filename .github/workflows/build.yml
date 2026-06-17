@@ -6,17 +6,20 @@ on:
       - 'v*'
 
 jobs:
-  # PHASE 1: Safely initialize the Release landing pad using GitHub's native tools
+  # STEP 1: Create the Release anchor first so Electron Forge has a landing pad
   create-release:
     name: Initialize GitHub Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      upload_url: ${{ steps.create_gh_release.outputs.upload_url }}
     steps:
       - name: Check out git repository
         uses: actions/checkout@v4
 
-      - name: Create Release Placeholder
+      - name: Create GitHub Release Wrapper
+        id: create_gh_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -26,10 +29,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # PHASE 2: Run the multi-platform builders and upload the files
+  # STEP 2: Run the compilation matrix and attach files safely
   release:
     name: Build for ${{ matrix.os }}
-    needs: create-release # ◄ Tells the builders to wait for Phase 1 to finish completely
+    needs: create-release # ◄ Forces this job to wait until Step 1 completely finishes
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
