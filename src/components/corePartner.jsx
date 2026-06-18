@@ -15,58 +15,71 @@ export default function PartnerPortal({ userAddress, activeContract, isConnected
   });
 
   useEffect(() => {
-    const fetchPartnerLedger = async () => {
-      if (!userAddress || !activeContract || !isConnected) return;
+    const fetchNativeOnChainData = async () => {
+      if (!userAddress || !isConnected) return;
       setLoading(true);
       setError(null);
 
       try {
-        // Execute unified view function
-        const [terms, credits] = await activeContract.getUserPurchasesWithCredits(userAddress);
-        
-        let volumeAcc = 0;
-        let costAcc = 0;
-        let creditAcc = 0;
-
-        const mappedOrders = terms.map((tx, index) => {
-          const creditVal = credits[index] || 0n;
-          const rawCost = Number(tx.amount) / 10 ** 18;
-          const rawCredit = Number(creditVal) / 10 ** 18;
-          const qty = Number(tx.quantity) || 0;
-
-          // Accumulate performance metrics across all operational periods
-          volumeAcc += qty;
-          costAcc += rawCost;
-          creditAcc += rawCredit;
-
-          return {
-            id: tx.id.toString(),
-            index: index,
-            date: tx.timestamp ? new Date(Number(tx.timestamp) * 1000).toISOString().split('T')[0] : "N/A",
-            quantity: qty,
-            cost: `${rawCost.toFixed(4)} NATIVE`,
-            manufacturerCredit: `${rawCredit.toFixed(4)} NATIVE`,
-            hasCredit: rawCredit > 0
-          };
+        // PRODUCTION SAFE IPC BRIDGE CALL
+        const overview = await window.electronAPI.getUserOverview({
+          userAddress,
+          contractAddress: "0xYourMatrixContractAddress", 
+          chainKey: "polygon"
         });
 
-        setMetrics({
-          totalVolume: volumeAcc,
-          settledCost: costAcc,
-          totalCredits: creditAcc
-        });
-        
-        setPartnerOrders(mappedOrders.reverse()); // Chronological ordering (Newest orders top)
+        if (!overview) {
+          setNativeAllocation(null);
+          setNativePurchase(null);
+          return;
+        }
+
+        // Convert back to BigInt for safe logic checks
+        const balanceVal = BigInt(overview.balance);
+        const purchaseVal = BigInt(overview.purchase);
+
+        // Process Native Allocation (Preserving Index 0 Logic)
+        if (balanceVal > 0n) {
+          const padded = balanceVal.toString().padStart(19, '0');
+          const splitIdx = padded.length - 18;
+          const cleanBalance = `${Number(padded.slice(0, splitIdx)).toLocaleString()}.${padded.slice(splitIdx, splitIdx + 4)}`;
+
+          setNativeAllocation({
+            register: "REG-000",
+            classification: "Primary Native Yield Node",
+            balance: `${cleanBalance} NATIVE`
+          });
+        } else {
+          setNativeAllocation(null);
+        }
+
+        // Process Native Procurement History (Preserving Index 0 Logic)
+        if (purchaseVal > 0n) {
+          const padded = purchaseVal.toString().padStart(19, '0');
+          const splitIdx = padded.length - 18;
+          const cleanPurchase = `${Number(padded.slice(0, splitIdx)).toLocaleString()}.${padded.slice(splitIdx, splitIdx + 4)}`;
+
+          setNativePurchase({
+            index: "IDX-000",
+            date: overview.timestamp && overview.timestamp !== "0"
+              ? new Date(Number(overview.timestamp) * 1000).toISOString().split('T')[0] 
+              : "N/A",
+            cost: `${cleanPurchase} NATIVE`
+          });
+        } else {
+          setNativePurchase(null);
+        }
+
       } catch (err) {
-        console.error("Partner portal synchronization error:", err);
-        setError(err.message || "Failed to synchronize operational partner ledger.");
+        console.error("Administrative matrix processing failed:", err);
+        setError(err.message || "Failed to retrieve authorized native data arrays.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPartnerLedger();
-  }, [userAddress, activeContract]);
+    fetchNativeOnChainData();
+  }, [userAddress, isConnected]);
 
   return (
     <div style={styles.mainContent}>

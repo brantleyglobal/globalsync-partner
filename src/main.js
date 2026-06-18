@@ -349,6 +349,110 @@ ipcMain.handle('blockchain:get-balances', async (event, userAddress) => {
   }
 });
 
+// Inside main.js
+ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, contractAddress, chainKey }) => {
+  if (!userAddress || !contractAddress) return [];
+
+  try {
+    const provider = providers[chainKey || 'polygon']; // Use appropriate network provider
+    if (!provider) throw new Error("Provider not configured");
+
+    // Re-use your existing ABI or the specific function layout
+    const affiliateAbi = ["function getAffiliateHistory(address user) view returns (tuple(address user, uint256 purchaseIndex, uint256 commission, string commissionHash)[])"];
+    const contract = new ethers.Contract(contractAddress, affiliateAbi, provider);
+
+    const records = await contract.getAffiliateHistory(userAddress);
+    
+    // Normalize into safe, clean strings before sending back across the IPC bridge
+    return records.map(rec => ({
+      user: rec.user,
+      purchaseIndex: rec.purchaseIndex.toString(),
+      commission: rec.commission.toString(),
+      commissionHash: rec.commissionHash
+    }));
+
+  } catch (error) {
+    console.error("Backend affiliate log fetch failed:", error);
+    throw error; // Let frontend catch it via the error state
+  }
+});
+
+// Add this under your existing handlers in main.js
+ipcMain.handle('blockchain:get-partner-ledger', async (event, { userAddress, contractAddress, chainKey }) => {
+  if (!userAddress || !contractAddress) return [[], []];
+
+  try {
+    const provider = providers[chainKey || 'polygon'];
+    if (!provider) throw new Error("Target blockchain provider is unconfigured.");
+
+    // Unified ABI fragment mapping the multi-array tuple returns
+    const partnerAbi = [
+      "function getUserPurchasesWithCredits(address user) view returns (tuple(uint256 id, uint256 amount, uint256 quantity, uint256 timestamp)[] terms, uint256[] credits)"
+    ];
+    
+    const contract = new ethers.Contract(contractAddress, partnerAbi, provider);
+
+    // Fetch the dual arrays safely away from browser environment blocks
+    const [terms, credits] = await contract.getUserPurchasesWithCredits(userAddress);
+    
+    // Normalize big variables into reliable strings before pushing across the bridge
+    const serializedTerms = (terms || []).map(tx => ({
+      id: tx.id.toString(),
+      amount: tx.amount.toString(),
+      quantity: tx.quantity.toString(),
+      timestamp: tx.timestamp.toString()
+    }));
+
+    const serializedCredits = (credits || []).map(c => c.toString());
+
+    return [serializedTerms, serializedCredits];
+
+  } catch (error) {
+    console.error("Backend partner ledger sync failure:", error);
+    throw error;
+  }
+});
+
+ipcMain.handle('blockchain:get-user-overview', async (event, { userAddress, contractAddress, chainKey }) => {
+  if (!userAddress || !contractAddress) return null;
+
+  try {
+    const provider = providers[chainKey || 'polygon'];
+    if (!provider) throw new Error("Target chain provider instance unconfigured.");
+
+    const overviewAbi = [
+      "function getUserOverview(address user) view returns (tuple(uint256[] balanceAmount, uint256[] purchases, uint256 timestamp)[])"
+    ];
+
+    const contract = new ethers.Contract(contractAddress, overviewAbi, provider);
+    const userOverviews = await contract.getUserOverview(userAddress);
+
+    if (!userOverviews || userOverviews.length === 0) return null;
+
+    const latestState = userOverviews[userOverviews.length - 1];
+
+    // GUARANTEES SYSTEM COMPLIANCE: If the required arrays are empty, handle safely
+    if (!latestState.balanceAmount?.length || !latestState.purchases?.length) {
+      return null;
+    }
+
+    // DESIGN REQUIREMENT: Preserved exactly as requested
+    const rawBalance = latestState.balanceAmount[0];
+    const rawPurchase = latestState.purchases[0];
+    const timestamp = latestState.timestamp;
+
+    return {
+      balance: rawBalance.toString(),
+      purchase: rawPurchase.toString(),
+      timestamp: timestamp ? timestamp.toString() : "0"
+    };
+
+  } catch (error) {
+    console.error("Backend investment matrix processing failed:", error);
+    throw error;
+  }
+});
+
 ipcMain.handle('trigger-vault', async (event, payload) => {
   try {
 

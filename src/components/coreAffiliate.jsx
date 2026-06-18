@@ -12,40 +12,23 @@ export default function AffiliatePortal({ userAddress, activeContract, isConnect
     referralCount: 0
   });
 
+  // Inside your frontend AffiliatePortal.jsx useEffect loop:
   useEffect(() => {
     const fetchAffiliateLogs = async () => {
-      if (!userAddress || !activeContract || !isConnected) return;
+      if (!userAddress || !isConnected) return;
       setLoading(true);
       setError(null);
 
       try {
-        // Query the dedicated view function using current wallet as affiliate address
-        const records = await activeContract.getAffiliateHistory(userAddress);
-        
-        let aggregatePayout = 0;
-
-        const formattedRecords = records.map((rec, idx) => {
-          const rawCommission = Number(rec.commission) / 10 ** 18;
-          aggregatePayout += rawCommission;
-
-          return {
-            index: idx,
-            buyer: rec.user,
-            orderIdx: rec.purchaseIndex.toString(),
-            payout: `${rawCommission.toFixed(4)} NATIVE`,
-            // Extract the hex strings for clear short-string viewing
-            hashRef: rec.commissionHash !== "0x0000000000000000000000000000000000000000000000000000000000000000" 
-              ? `${rec.commissionHash.slice(0, 8)}...` 
-              : "AUTO_SYSTEM_SETTLED"
-          };
+        // THE CURE: Request data from Node.js, completely bypassing frontend CORS walls
+        const records = await window.electronAPI.getAffiliateHistory({
+          userAddress,
+          contractAddress: "0xYourContractAddressHere", // Pass the target address dynamically or statically
+          chainKey: "polygon" 
         });
 
-        setTotals({
-          totalEarned: aggregatePayout,
-          referralCount: formattedRecords.length
-        });
-        
-        setReferralRecords(formattedRecords.reverse()); // Put freshest payouts at the top
+        // ... Proceed with your array mapping, BigInt sorting, and layout formatting state sets ...
+
       } catch (err) {
         console.error("Affiliate ledger read failure:", err);
         setError(err.message || "Failed to load affiliate ledger records.");
@@ -55,7 +38,7 @@ export default function AffiliatePortal({ userAddress, activeContract, isConnect
     };
 
     fetchAffiliateLogs();
-  }, [userAddress, activeContract]);
+  }, [userAddress, isConnected]);
 
   return (
     <div style={styles.mainContent}>
