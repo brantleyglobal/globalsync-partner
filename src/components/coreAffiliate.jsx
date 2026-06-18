@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
 
-export default function AffiliatePortal({ userAddress, activeContract }) {
+export default function AffiliatePortal({ userAddress, activeContract, isConnected }) {
   const [referralRecords, setReferralRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -14,7 +14,7 @@ export default function AffiliatePortal({ userAddress, activeContract }) {
 
   useEffect(() => {
     const fetchAffiliateLogs = async () => {
-      if (!userAddress || !activeContract) return;
+      if (!userAddress || !activeContract || !isConnected) return;
       setLoading(true);
       setError(null);
 
@@ -69,7 +69,7 @@ export default function AffiliatePortal({ userAddress, activeContract }) {
             <div>
                 <h1 style={{ ...styles.title, fontWeight: "100", margin: 0, paddingBottom: "4px" }}>AFFILIATE PORTAL</h1>
                 <p style={{ ...styles.subtitle, margin: 0 }}>
-                    ACCOUNT STATUS: {userAddress ? (
+                    ACCOUNT STATUS: {isConnected ? (
                     <span style={{ fontFamily: "monospace", color: "#4ade80", fontWeight: "600" }}>ACTIVE</span>
                     ) : (
                     <span style={{ color: "#ef4444", fontWeight: "600" }}>DISCONNECTED</span>
@@ -88,7 +88,7 @@ export default function AffiliatePortal({ userAddress, activeContract }) {
                     fontFamily: "monospace",
                     border: "1px solid #111"
                 }}>
-                    {userAddress 
+                    {isConnected && userAddress 
                     ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` 
                     : "0xNone"}
                 </code>
@@ -105,7 +105,7 @@ export default function AffiliatePortal({ userAddress, activeContract }) {
       )}
 
       {/* METRIC ROW */}
-      {userAddress && (
+      {isConnected && userAddress && (
         <div style={{ display: "flex", gap: "16px", marginBottom: "30px" }}>
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0 }}>
             <span style={{ color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "bold", display: "block", marginBottom: "6px" }}>CONVERTED ORDERS</span>
@@ -125,7 +125,7 @@ export default function AffiliatePortal({ userAddress, activeContract }) {
           <thead>
             <tr style={{ borderBottom: "1px solid #161616" }}>
               <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "600" }}>PAYOUT RECORD</th>
-              <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "600" }}>BUYER NODE IDENTITY</th>
+              <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "600" }}>BUYER IDENTITY</th>
               <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "600", textAlign: "center" }}>BUYER TX INDEX</th>
               <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "600" }}>CLEARING HASH</th>
               <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "600", textAlign: "right" }}>SETTLED REWARD</th>

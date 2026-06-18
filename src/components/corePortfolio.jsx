@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
 
-export default function CorePortfolioMatrix({ userAddress, activeContract }) {
+export default function CorePortfolioMatrix({ userAddress, activeContract, isConnected }) {
   const [nativeAllocation, setNativeAllocation] = useState(null);
   const [nativePurchase, setNativePurchase] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -10,7 +10,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract }) {
 
   useEffect(() => {
     const fetchNativeOnChainData = async () => {
-      if (!userAddress || !activeContract) return;
+      if (!userAddress || !activeContract || !isConnected) return;
       setLoading(true);
       setError(null);
 
@@ -108,7 +108,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract }) {
       </div>
 
       {/* ACCESS & OPERATIONAL MONITOR */}
-      {(!userAddress || error || loading) && (
+      {(!isConnected || error || loading) && (
         <div style={{ ...styles.jsonDisplay, color: error ? "#ef4444" : "#054e1a", marginBottom: "30px", maxHeight: "none" }}>
           {loading && <div>Reading isolated baseline index [0] from admin struct matrix...</div>}
           {error && <div><strong>AUTHORIZATION FAILURE:</strong> {error}</div>}

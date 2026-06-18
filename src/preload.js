@@ -1,16 +1,24 @@
 // preload.js
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose the raw EIP-1193 provider methods safely to the UI frontend
-contextBridge.exposeInMainWorld('electronEthereum', {
-  request: async (args) => {
-    if (!window.ethereum) throw new Error("No crypto wallet found");
-    return await window.ethereum.request(args);
-  },
-  on: (eventName, callback) => {
-    if (window.ethereum) window.ethereum.on(eventName, callback);
-  },
-  removeListener: (eventName, callback) => {
-    if (window.ethereum) window.ethereum.removeListener(eventName, callback);
-  }
+// Expose secure internal wallet management methods to your React UI
+contextBridge.exposeInMainWorld('electronAPI', {
+
+  fetchBalances: (address) => ipcRenderer.invoke('blockchain:get-balances', address),
+  
+  // 1. Send raw user inputs down to Main Process for hardware-tied encryption
+  saveAdminCredentials: (address, method, secret, password) => 
+    ipcRenderer.invoke('secure-save-credentials', { address, method, secret, password }),
+    
+  // 2. Erase the secure wallet data completely from local storage/disk
+  disconnectAdmin: () => 
+    ipcRenderer.invoke('secure-disconnect-wallet'),
+
+  // 3. Ask the Main Process if an admin profile is already configured on startup
+  getAdminStatus: () => 
+    ipcRenderer.invoke('get-admin-status'),
+
+  // 4. Trigger an on-chain transaction or signing request using the secured key
+  executeTransaction: (txData) =>
+    ipcRenderer.invoke('secure-execute-transaction', txData)
 });

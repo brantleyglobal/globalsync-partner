@@ -56,7 +56,8 @@ export default function CoreAdminEngine({
   setTransactionHash,
   custodialWallet,
   setCustodialWallet,
-  handleVerifyDeposit
+  handleVerifyDeposit,
+  isConnected
 }) {
   return (
     <main style={styles.mainContent}>
@@ -70,7 +71,7 @@ export default function CoreAdminEngine({
                 <div>
                     <h1 style={{ ...styles.title, fontWeight: "100", margin: 0, paddingBottom: "4px" }}>ADMIN ENGINE</h1>
                     <p style={{ ...styles.subtitle, margin: 0 }}>
-                        ACCOUNT STATUS: {userAddress ? (
+                        ACCOUNT STATUS: {isConnected ? (
                         <span style={{ fontFamily: "monospace", color: "#4ade80", fontWeight: "600" }}>ACTIVE</span>
                         ) : (
                         <span style={{ color: "#ef4444", fontWeight: "600" }}>DISCONNECTED</span>
@@ -89,7 +90,7 @@ export default function CoreAdminEngine({
                         fontFamily: "monospace",
                         border: "1px solid #111"
                     }}>
-                        {userAddress 
+                        {isConnected && userAddress 
                         ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` 
                         : "0xNone"}
                     </code>

@@ -53,8 +53,9 @@ function createWindow() {
     height: 800,
     icon: iconPath, 
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true
     }
   });
 
@@ -219,6 +220,135 @@ function rescaleAmount(amount, fromDecimals, toDecimals) {
 }
 
 // This listens for the frontend dashboard to send data over the 'run-vault' bridge
+// ==================== BEFORE (ORIGINAL) ====================
+// (This space was completely empty)
+
+// ==================== AFTER (UPDATED SECURE) ====================
+// Checks if a secure credential profile exists on the user's hardware disk
+// 1. Declare a simple session object in the background memory (top of main.js)
+let activeAdminSession = {
+  isConnected: false,
+  address: "",
+  method: "",
+  secret: "",
+  password: ""
+};
+
+// ========================================================
+// REWRITTEN: IN-MEMORY IPC HANDLERS
+// ========================================================
+
+// 1. Checks if a live session currently exists in active memory
+ipcMain.handle('get-admin-status', async () => {
+  return {
+    isConnected: activeAdminSession.isConnected,
+    address: activeAdminSession.address,
+    method: activeAdminSession.method
+  };
+});
+
+// 2. Holds cleartext inputs strictly inside Node's background RAM variable
+ipcMain.handle('secure-save-credentials', async (event, { address, method, secret, password }) => {
+  try {
+    if (!address || !secret) {
+      throw new Error("Critical Exception: Missing address or secret credentials.");
+    }
+
+    // Save everything strictly to your system's volatile RAM space
+    activeAdminSession = {
+      isConnected: true,
+      address,
+      method,
+      secret,    // Isolated from React/Chromium memory scrapping
+      password   // Kept strictly inside the background runtime
+    };
+
+    // Return the absolute truth directly to the frontend response payload
+    return { 
+      success: true, 
+      isConnected: activeAdminSession.isConnected, 
+      address: activeAdminSession.address 
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Flushes and purges the memory space completely on logout
+ipcMain.handle('secure-disconnect-wallet', async () => {
+  activeAdminSession = {
+    isConnected: false,
+    address: "",
+    method: "",
+    secret: "",
+    password: ""
+  };
+  return { success: true };
+});
+
+ipcMain.handle('blockchain:get-balances', async (event, userAddress) => {
+  if (!userAddress || typeof userAddress !== 'string') return [];
+
+  try {
+    // 1. Group tokens by their defined chain property
+    const grouped = { ethereum: [], polygon: [], globalChain: [] };
+    
+    // Fallback array check to handle common CommonJS module export variations Safely
+    const tokenList = Array.isArray(supportedTokens) 
+      ? supportedTokens 
+      : (supportedTokens.supportedTokens || []);
+
+    tokenList.forEach(token => {
+      const key = token.chain === 'global' ? 'globalChain' : token.chain;
+      if (grouped[key]) grouped[key].push(token);
+    });
+
+    // 2. Loop through each chain client concurrently
+    const balancePromises = Object.entries(grouped).map(async ([chainKey, tokens]) => {
+      if (tokens.length === 0) return [];
+      
+      const provider = providers[chainKey];
+      if (!provider) return [];
+
+      // Execute queries for this specific network group
+      const results = await Promise.allSettled(
+        tokens.map(async (token) => {
+          let rawBalance = 0n;
+
+          if (token.isNative) {
+            rawBalance = await provider.getBalance(userAddress);
+          } else {
+            const contract = new ethers.Contract(token.address, erc20Abi, provider);
+            rawBalance = await contract.balanceOf(userAddress);
+          }
+
+          return {
+            symbol: token.symbol,
+            address: token.address,
+            decimals: token.decimals || 18,
+            // Stringify BigInt completely prevents Electron IPC payload breakages
+            balance: rawBalance.toString(), 
+            isNative: !!token.isNative,
+            chain: token.chain,
+          };
+        })
+      );
+
+      return results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => r.value)
+        .filter(token => BigInt(token.balance) > 0n); // Drop zero entries
+    });
+
+    const allResults = await Promise.all(balancePromises);
+    return allResults.flat();
+
+  } catch (error) {
+    console.error("IPC main process execution failed:", error);
+    return [];
+  }
+});
+
 ipcMain.handle('trigger-vault', async (event, payload) => {
   try {
 
@@ -263,7 +393,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
     // Automates checking total count, verifying limit, and fetching array items loop in backend
     if (modeArg === "user-activity") {
       const provider = providers.globalChain;
-      const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, rpcProvider);
+      const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, provider);
       const results = [];
       
       if (txType === "Deposit") {
@@ -312,7 +442,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
         provider = providers.ethereum; 
       }
 
-      const receipt = await rpcProvider.getTransactionReceipt(transactionHash);
+      const receipt = await provider.getTransactionReceipt(transactionHash);
       if (!receipt) return { ok: false, reason: "Receipt not found on-chain." };
       if (receipt.status !== 1) return { ok: false, reason: "Transaction reverted on-chain." };
 
@@ -393,21 +523,35 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
     // ==========================================
     if (modeArg === "execute-state-change") {
       const provider = providers.globalChain;
-      if (!cryptoAuth || Object.keys(cryptoAuth).length === 0) {
-        return { status: "Error", error: "Authentication credentials missing for state changes." };
+      
+      // Check if an encrypted file exists locally
+      if (!fs.existsSync(secureConfigPath)) {
+        return { status: "Error", error: "No admin wallet profile configured on this system." };
       }
 
-      // 1. Initialize signer identity context from payload profile
+      const activeProfile = JSON.parse(fs.readFileSync(secureConfigPath, 'utf8'));
       let signer;
-      if (cryptoAuth.authMethod === 'privateKey') {
-        signer = new ethers.Wallet(cryptoAuth.privateKey, provider);
-      } else if (cryptoAuth.authMethod === 'mnemonic') {
-        signer = ethers.Wallet.fromPhrase(cryptoAuth.mnemonicPhrase, provider);
-      } else if (cryptoAuth.authMethod === 'keystore') {
-        signer = await ethers.Wallet.fromEncryptedJson(cryptoAuth.keystoreJson, cryptoAuth.keystorePassword);
+
+      // Safely read and decrypt the stored hardware profile on the fly
+      if (activeProfile.method === 'privateKey') {
+        const encryptedBuffer = Buffer.from(activeProfile.secret, 'base64');
+        const rawKey = safeStorage.decryptString(encryptedBuffer); // Decrypt via OS key
+        signer = new ethers.Wallet(rawKey, provider);
+      } else if (activeProfile.method === 'mnemonic') {
+        const encryptedBuffer = Buffer.from(activeProfile.secret, 'base64');
+        const rawPhrase = safeStorage.decryptString(encryptedBuffer);
+        signer = ethers.Wallet.fromPhrase(rawPhrase, provider);
+      } else if (activeProfile.method === 'keystore') {
+        const rawJson = Buffer.from(activeProfile.secret, 'base64').toString('utf8');
+        let pass = "";
+        const kpPath = path.join(app.getPath('userData'), '.kp');
+        if (fs.existsSync(kpPath)) {
+          pass = safeStorage.decryptString(Buffer.from(fs.readFileSync(kpPath, 'utf8'), 'base64'));
+        }
+        signer = await ethers.Wallet.fromEncryptedJson(rawJson, pass);
         signer = signer.connect(provider);
       } else {
-        return { status: "Error", error: "Unsupported transaction signing key type." };
+        return { status: "Error", error: "Unsupported structural signing key type." };
       }
 
       console.log(`Executing contract state modification using signer: ${signer.address}`);
@@ -487,6 +631,8 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
         summary: `Purchase successful! Config [${configurationSummary}] verified in block footprint.` 
       };
     }
+
+    signer = null;
 
   } catch (error) {
     console.error("Backend Contract Call Error:", error);

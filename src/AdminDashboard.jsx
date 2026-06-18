@@ -26,17 +26,8 @@ export default function AdminDashboard() {
   // Add this state alongside your showAuthDrawer and isOpen states
   const [portalView, setPortalView] = useState('admin'); // Defaulting to your current view
   
-  const [showAuthDrawer, setShowAuthDrawer] = useState(false); // Set to true if you want it open by default
+  const [showAuthDrawer, setShowAuthDrawer] = useState(false);
 
-  const handleDisconnectWallet = () => {
-    setUserAddress("");
-    setPrivateKey("");
-    setKeystoreJson("");
-    setKeystorePassword("");
-    setMnemonicPhrase("");
-    // If you are setting balances array somewhere globally/locally, clear it too:
-    // setBalances([]); 
-  };
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState("");
@@ -54,6 +45,7 @@ export default function AdminDashboard() {
   const [showKeystorePass, setShowKeystorePass] = useState(false);
   const [mnemonicPhrase, setMnemonicPhrase] = useState("");
   const [showMnemonic, setShowMnemonic] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   const [selectedStableTokenSymbol, setSelectedStableTokenSymbol] = useState(""); // e.g., "LGE20KVA"
   const [selectedAssetKey, setSelectedAssetKey] = useState(""); // e.g., "LGE20KVA"
@@ -75,73 +67,8 @@ export default function AdminDashboard() {
 
   const [purchaseTxHash, setPurchaseTxHash] = useState("");
   const [shippingDays, setShippingDays] = useState(90);
-
-  const { balances } = useDirectTokenBalances();
-
-  const handleSaveCredentials = async () => {
-    // 1. Structural Validation Guard
-    if (!authMethod) {
-      alert("Please select a credential type.");
-      return;
-    }
-
-    let derivedAddress = "";
-    let payload = { authMethod };
-
-    try {
-      // 2. Cryptographic Parsing & Address Derivation
-      if (authMethod === 'privateKey') {
-        if (!privateKey || privateKey.length < 64) throw new Error("Invalid Private Key length.");
-        
-        // Ensure hex formatting prefix
-        const formattedKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
-        const wallet = new ethers.Wallet(formattedKey);
-        
-        derivedAddress = wallet.address;
-        payload.privateKey = formattedKey;
-
-      } else if (authMethod === 'keystore') {
-        if (!keystoreJson || !keystorePassword) throw new Error("Missing Keystore JSON or Password.");
-        
-        // Note: Decrypting a keystore takes a few seconds, standard UX uses a loading state here
-        const wallet = await ethers.Wallet.fromEncryptedJson(keystoreJson, keystorePassword);
-        
-        derivedAddress = wallet.address;
-        payload.keystoreJson = keystoreJson;
-        payload.keystorePassword = keystorePassword;
-
-      } else if (authMethod === 'mnemonic') {
-        if (!mnemonicPhrase) throw new Error("Mnemonic phrase cannot be empty.");
-        
-        const wallet = ethers.Wallet.fromMnemonic(mnemonicPhrase.trim());
-        
-        derivedAddress = wallet.address;
-        payload.mnemonicPhrase = mnemonicPhrase.trim();
-      }
-
-      // 3. Address Mismatch Safety Check
-      // If the admin typed a wallet address AND provided a key, verify they match!
-      if (userAddress && userAddress.toLowerCase() !== derivedAddress.toLowerCase()) {
-        throw new Error("Provided Admin Wallet Address does not match the derived credential key.");
-      }
-
-      // 4. Commit to Global App State
-      // This instantly toggles your status bar to CONNECTED using a verified public key
-      setUserAddress(derivedAddress); 
-      
-      console.log("Admin Credentials Verified & Initialized successfully:", derivedAddress);
-      alert(`Wallet initialized successfully: ${derivedAddress.slice(0,6)}...${derivedAddress.slice(-4)}`);
-
-      // TODO: Pass 'payload' or the initialized signer instance to your global Web3 provider context
-
-    } catch (error) {
-      console.error("Initialization Failed:", error.message);
-      alert(`Security Initialization Error: ${error.message}`);
-      
-      // Clear out user address to drop the status bar back to 'NOT INITIALIZED' on failure
-      setUserAddress(""); 
-    }
-  };
+  
+  const { balances } = useDirectTokenBalances(userAddress);
 
   const getUnixTimestamp = (dateStr, isEndOfDay = false) => {
     if(!dateStr) return Math.floor(Date.now() / 1000);
@@ -498,7 +425,67 @@ export default function AdminDashboard() {
     }
   };
 
-return (
+  const handleSecureConnect = async (authMethod, secretToSend, keystorePassword) => {
+    if (!userAddress) {
+      alert("Please enter a wallet address.");
+      return { success: false };
+    }
+
+    try {
+      const response = await window.electronAPI.saveAdminCredentials(
+        userAddress,
+        authMethod,
+        secretToSend,
+        keystorePassword
+      );
+
+      // BACKEND VERIFICATION CHECK FIRST
+      if (response && response.success) {
+        setUserAddress(response.address);
+        setIsConnected(response.isConnected); // Set true ONLY when backend verifies keys match
+        
+        // CRITICAL SECURITY WIPEOUT: Clear cleartext fields from React RAM immediately
+        setPrivateKey('');
+        setKeystoreJson('');
+        setKeystorePassword('');
+        setMnemonicPhrase('');
+        
+        return { success: true };
+      } else {
+        alert(`Connection Failed: ${response?.error || 'Invalid Credentials'}`);
+        setIsConnected(false);
+        return { success: false };
+      }
+    } catch (ipcError) {
+      console.error("IPC Bridge Exception:", ipcError);
+      setIsConnected(false);
+      return { success: false };
+    }
+  };
+
+  const handleSecureDisconnect = async () => {
+    try {
+      const response = await window.electronAPI.disconnectAdmin();
+
+      if (response && response.success) {
+        setUserAddress('');
+        setIsConnected(false); // Cleanly drop UI connection state
+
+        setPrivateKey('');
+        setKeystoreJson('');
+        setKeystorePassword('');
+        setMnemonicPhrase('');
+
+        return { success: true };
+      }
+      return { success: false };
+    } catch (error) {
+      console.error("IPC disconnection tracking pipeline failure:", error);
+      return { success: false };
+    }
+  };
+
+  return (
   <div style={styles.appContainer}>
 
     {/* SIDEBAR COMPONENT */}
@@ -508,6 +495,26 @@ return (
       userAddress={userAddress}
       setUserAddress={setUserAddress}
       balances={balances}
+      // ADD THESE DEFINITIVE DRIVER PROPS HERE:
+      authMethod={authMethod}
+      setAuthMethod={setAuthMethod}
+      privateKey={privateKey}
+      setPrivateKey={setPrivateKey}
+      keystoreJson={keystoreJson}
+      setKeystoreJson={setKeystoreJson}
+      keystorePassword={keystorePassword}
+      setKeystorePassword={setKeystorePassword}
+      mnemonicPhrase={mnemonicPhrase}
+      setMnemonicPhrase={setMnemonicPhrase}
+      showKey={showKey}
+      setShowKey={setShowKey}
+      showKeystorePass={showKeystorePass}
+      setShowKeystorePass={setShowKeystorePass}
+      showMnemonic={showMnemonic}
+      setShowMnemonic={setShowMnemonic}
+      isConnected={isConnected}
+      onConnectWallet={handleSecureConnect}
+      onDisconnectWallet={handleSecureDisconnect}
     />
 
     {/* DYNAMIC WORKSPACE PORTAL CONTAINER */}
@@ -515,7 +522,11 @@ return (
       
       {/* VIEW 1: INVESTMENTS PANEL */}
       {portalView === 'investments' && (
-        <CorePortfolioMatrix userAddress={userAddress} balances={balances} />
+        <CorePortfolioMatrix 
+          userAddress={userAddress}
+          balances={balances}
+          isConnected={isConnected}
+        />
       )}
 
       {/* VIEW 2: PARTNER PORTAL (WHOLESALE DISTRIBUTION WORKSPACE) */}
@@ -523,12 +534,17 @@ return (
         <PartnerPortal 
           userAddress={userAddress} 
           activeContract={selectedContract}
+          isConnected={isConnected} 
         />
       )}
 
       {/* VIEW 3: AFFILIATE PORTAL NETWORK PANEL */}
       {portalView === 'affiliate' && (
-        <AffiliatePortal userAddress={userAddress} activeContract={selectedContract} />
+        <AffiliatePortal
+          userAddress={userAddress}
+          activeContract={selectedContract}
+          isConnected={isConnected}
+        />
       )}
       
       {/* VIEW 2: CORE ADMIN ENGINE PANEL */}
@@ -589,6 +605,7 @@ return (
           custodialWallet={custodialWallet}
           setCustodialWallet={setCustodialWallet}
           handleVerifyDeposit={handleVerifyDeposit}
+          isConnected={isConnected} 
         />
       )}
 

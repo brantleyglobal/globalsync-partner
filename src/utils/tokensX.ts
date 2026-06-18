@@ -473,7 +473,7 @@ export const supportedTokens: Token[] = [
   {
     name: "Global Dollar",
     symbol: "GBDo",
-    address: deployments.GlobalDollar,
+    address: "0x0000000000000000000000000000000000000000",
     decimals: 18,
     isNative: true,
     chain: "global",

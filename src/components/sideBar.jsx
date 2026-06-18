@@ -8,26 +8,54 @@ export default function Sidebar({
   setPortalView, 
   userAddress, 
   setUserAddress, 
-  balances = [] // Defaulting to an array prevents crashing if undefined
+  balances = [],
+  authMethod,
+  setAuthMethod,
+  privateKey,
+  setPrivateKey,
+  keystoreJson,
+  setKeystoreJson,
+  keystorePassword,
+  setKeystorePassword,
+  mnemonicPhrase,
+  setMnemonicPhrase,
+  showKey,
+  setShowKey,
+  showKeystorePass,
+  setShowKeystorePass,
+  showMnemonic,
+  setShowMnemonic,
+  isConnected,
+  onConnectWallet,
+  onDisconnectWallet
 }) {
   // Keep your local layout toggle states here
   const [showAuthDrawer, setShowAuthDrawer] = useState(false);
   const [isOpen, setIsOpen] = useState(false); // operational compliance drawer
-  const [authMethod, setAuthMethod] = useState('privateKey');
-  
-  // Keep your local input visibility states here
-  const [showKey, setShowKey] = useState(false);
-  const [showKeystorePass, setShowKeystorePass] = useState(false);
-  const [showMnemonic, setShowMnemonic] = useState(false);
 
-  // Keep your form states here
-  const [privateKey, setPrivateKey] = useState('');
-  const [keystoreJson, setKeystoreJson] = useState('');
-  const [keystorePassword, setKeystorePassword] = useState('');
-  const [mnemonicPhrase, setMnemonicPhrase] = useState('');
+  const handleSaveCredentials = async () => {
+    // Guard check: Ensure they filled in the public target address
+    if (!userAddress) return alert("Please enter a wallet address.");
 
-  const handleSaveCredentials = () => { /* ... your logic */ };
-  const handleDisconnectWallet = () => { /* ... your logic */ };
+    // Extract the correct secret depending on their selected method
+    let secretToSend = '';
+    if (authMethod === 'privateKey') secretToSend = privateKey;
+    if (authMethod === 'keystore') secretToSend = keystoreJson;
+    if (authMethod === 'mnemonic') secretToSend = mnemonicPhrase;
+
+    const result = await onConnectWallet(authMethod, secretToSend, keystorePassword);
+  };
+
+  const handleDisconnectWallet = async () => {
+    // Fire off the master parent flush routine
+    const result = await onDisconnectWallet();
+    
+    if (result.success) {
+      
+      // Close out the toggle parameters to minimize cleartext layout remnants
+      setShowAuthDrawer(false); 
+    }
+  };
 
   return (
     <aside style={{
@@ -59,13 +87,13 @@ export default function Sidebar({
 
           <div style={{ display: "flex", flexDirection: "column", whiteSpace: "nowrap" }}>
               <h2 style={{ ...styles.title, margin: 0, fontSize: "20px", letterSpacing: "1px", color: "#a5a5a5", fontWeight: "100" }}>
-              GLOBAL SYNC
+                GLOBAL SYNC
               </h2>
               <span style={{ ...styles.subtitle, margin: 0, fontSize: "14px", opacity: 0.6 }}>
-              ADMIN DASHBOARD
+                ADMIN DASHBOARD
               </span>
               <span style={{ ...styles.subtitle, margin: 0, fontSize: "8px", opacity: 0.6 }}>
-              by BG COMPANY
+                by BG COMPANY
               </span>
           </div>
         </div>
@@ -133,14 +161,14 @@ export default function Sidebar({
                   <label style={styles.label}>PRIVATE KEY</label>
                   <div style={{...styles.cryptoInputWrapper, marginBottom: '16px'}}>
                       <input
-                      type={showKey ? "text" : "password"}
-                      placeholder="••••••••••••••••••••••••"
-                      style={{...styles.sidebarInput, marginBottom: 0, paddingRight: '45px'}}
-                      value={privateKey}
-                      onChange={(e) => setPrivateKey(e.target.value)}
+                        type={showKey ? "text" : "password"}
+                        placeholder="••••••••••••••••••••••••"
+                        style={{...styles.sidebarInput, marginBottom: 0, paddingRight: '45px'}}
+                        value={privateKey}
+                        onChange={(e) => setPrivateKey(e.target.value)}
                       />
                       <button type="button" onClick={() => setShowKey(!showKey)} style={styles.visibilityToggle}>
-                      {showKey ? "Hide" : "Show"}
+                        {showKey ? "Hide" : "Show"}
                       </button>
                   </div>
                   </>
@@ -160,14 +188,14 @@ export default function Sidebar({
                   <label style={{...styles.label, marginTop:'10px'}}>KEYSTORE PASSWORD</label>
                   <div style={{...styles.cryptoInputWrapper, marginBottom: '16px'}}>
                       <input
-                      type={showKeystorePass ? "text" : "password"}
-                      placeholder="Password to decrypt keystore"
-                      style={{...styles.sidebarInput, marginBottom: 0, paddingRight: '45px'}}
-                      value={keystorePassword}
-                      onChange={(e) => setKeystorePassword(e.target.value)}
+                        type={showKeystorePass ? "text" : "password"}
+                        placeholder="Password to decrypt keystore"
+                        style={{...styles.sidebarInput, marginBottom: 0, paddingRight: '45px'}}
+                        value={keystorePassword}
+                        onChange={(e) => setKeystorePassword(e.target.value)}
                       />
                       <button type="button" onClick={() => setShowKeystorePass(!showKeystorePass)} style={styles.visibilityToggle}>
-                      {showKeystorePass ? "Hide" : "Show"}
+                        {showKeystorePass ? "Hide" : "Show"}
                       </button>
                   </div>
                   </>
@@ -179,33 +207,44 @@ export default function Sidebar({
                   <label style={styles.label}>SEED PHRASE (12/24 WORDS)</label>
                   <div style={{...styles.cryptoInputWrapper, marginBottom: '16px'}}>
                       <textarea
-                      placeholder="word1 word2 word3..."
-                      style={{...styles.sidebarInput, height: '70px', paddingRight: '45px', WebkitTextSecurity: showMnemonic ? 'none' : 'disc'}}
-                      value={mnemonicPhrase}
-                      onChange={(e) => setMnemonicPhrase(e.target.value)}
+                        key={`mnemonic-field-${mnemonicPhrase === ''}`}
+                        placeholder="word1 word2 word3..."
+                        style={{...styles.sidebarInput, height: '70px', paddingRight: '45px', WebkitTextSecurity: showMnemonic ? 'none' : 'disc'}}
+                        value={mnemonicPhrase}
+                        onChange={(e) => setMnemonicPhrase(e.target.value)}
                       />
                       <button type="button" onClick={() => setShowMnemonic(!showMnemonic)} style={{...styles.visibilityToggle, top: '20px'}}>
-                      {showMnemonic ? "Hide" : "Show"}
+                        {showMnemonic ? "Hide" : "Show"}
                       </button>
                   </div>
                   </>
               )}
 
-              <button style={{...styles.btnForestGreen, background: "#0a0a0a", fontWeight: "lighter", marginBottom: "8px"}} onClick={handleSaveCredentials}>
-                  INITIALIZE CREDENTIALS
-              </button>
+              {!isConnected &&  ( 
 
-              {userAddress && (
+              <button style={{
+                ...styles.btnForestGreen,
+                background: "#0a0a0a96",
+                border: "1px solid rgba(0, 0, 0, 0.76)",
+                fontWeight: "lighter",
+                fontSize: "11px",
+                marginBottom: "8px"
+                }} onClick={handleSaveCredentials}>
+                  CONNECT WALLET
+              </button>
+              )}
+
+              {isConnected && (
                   <button 
                   type="button"
                   onClick={handleDisconnectWallet}
                   style={{
                       width: "100%",
                       padding: "8px",
-                      background: "rgba(239, 68, 68, 0.08)",
-                      border: "1px solid rgba(239, 68, 68, 0.2)",
+                      background: "#0a0a0ab6",
+                      border: "1px solid rgba(0, 0, 0, 0.76)",
                       borderRadius: "4px",
-                      color: "#ef4444",
+                      color: "#444444",
                       fontSize: "11px",
                       fontWeight: "600",
                       letterSpacing: "0.5px",
@@ -213,12 +252,12 @@ export default function Sidebar({
                       transition: "all 0.2s ease"
                   }}
                   onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(239, 68, 68, 0.15)";
-                      e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.4)";
+                      e.currentTarget.style.background = "rgba(10, 10, 10, 0.83)";
+                      e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.76)";
                   }}
                   onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "rgba(239, 68, 68, 0.08)";
-                      e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.2)";
+                      e.currentTarget.style.background = "rgba(10, 10, 10, 0.83)";
+                      e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.76)";
                   }}
                   >
                   DISCONNECT WALLET
@@ -228,6 +267,8 @@ export default function Sidebar({
           )}
         </div>
 
+        <hr style={styles.divider} />
+
         {/* PORTAL VIEW SELECTION SYSTEM */}
         <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "0 12px 16px 12px", fontFamily: "system-ui" }}>
           <span style={{ color: "#444", fontSize: "10px", letterSpacing: "1px", fontWeight: "bold", marginBottom: "4px" }}>
@@ -235,8 +276,10 @@ export default function Sidebar({
                   width: "6px", 
                   height: "6px", 
                   borderRadius: "50%", 
-                  background: showAuthDrawer ? "#4ade80" : "#333",
-                  boxShadow: showAuthDrawer ? "0 0 8px #4ade80" : "none"
+                  background: showAuthDrawer ? "#050505" : "#333",
+                  boxShadow: showAuthDrawer ? "0 0 8px #131614" : "none",
+                  borderTop: "1px solid #1a1a1a",
+                  borderBottom: "1px solid #1a1a1a"
               }} />
               WORKSPACE PORTALS:
           </span>
@@ -245,9 +288,9 @@ export default function Sidebar({
               onClick={() => setPortalView('admin')}
               style={{
               ...styles.navItem, 
-              background: portalView === 'admin' ? "rgba(74, 222, 128, 0.08)" : "transparent",
-              color: portalView === 'admin' ? "#4ade80" : "#777",
-              border: "1px solid " + (portalView === 'admin' ? "rgba(74, 222, 128, 0.2)" : "transparent"),
+              background: portalView === 'admin' ? "rgba(0, 0, 0, 0.36)" : "transparent",
+              color: portalView === 'admin' ? "#5b6b5f" : "#777",
+              border: "1px solid " + (portalView === 'admin' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
               padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
               }}
           >
@@ -258,9 +301,9 @@ export default function Sidebar({
               onClick={() => setPortalView('affiliate')}
               style={{
               ...styles.navItem, 
-              background: portalView === 'affiliate' ? "rgba(74, 222, 128, 0.08)" : "transparent",
-              color: portalView === 'affiliate' ? "#4ade80" : "#777",
-              border: "1px solid " + (portalView === 'affiliate' ? "rgba(74, 222, 128, 0.2)" : "transparent"),
+              background: portalView === 'affiliate' ? "rgba(0, 0, 0, 0.36)" : "transparent",
+              color: portalView === 'affiliate' ? "#5b6b5f" : "#777",
+              border: "1px solid " + (portalView === 'affiliate' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
               padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
               }}
           >
@@ -271,9 +314,9 @@ export default function Sidebar({
               onClick={() => setPortalView('wholesale')}
               style={{
               ...styles.navItem, 
-              background: portalView === 'wholesale' ? "rgba(74, 222, 128, 0.08)" : "transparent",
-              color: portalView === 'wholesale' ? "#4ade80" : "#777",
-              border: "1px solid " + (portalView === 'wholesale' ? "rgba(74, 222, 128, 0.2)" : "transparent"),
+              background: portalView === 'wholesale' ? "rgba(0, 0, 0, 0.36)" : "transparent",
+              color: portalView === 'wholesale' ? "#5b6b5f" : "#777",
+              border: "1px solid " + (portalView === 'wholesale' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
               padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
               }}
           >
@@ -298,53 +341,81 @@ export default function Sidebar({
 
         {/* ACCOUNT BALANCES DISPLAY (MIDDLE PANEL) */}
         <div style={{ 
-          background: "rgba(0, 0, 0, 0.25)", 
-          padding: "14px 12px", 
-          borderRadius: "4px", 
-          border: "1px solid #14141400", 
-          margin: "0 12px 24px 12px",
-          fontSize: "12px",
-          fontFamily: "system-ui, sans-serif"
+        background: "rgba(0, 0, 0, 0.4)", 
+        padding: "14px 12px", 
+        borderRadius: "4px", 
+        border: "1px solid #000000d0", 
+        margin: "0 12px 24px 12px",
+        fontSize: "12px",
+        fontFamily: "system-ui, sans-serif"
         }}>
-          <span style={{ color: "#666", display: "block", marginBottom: "12px", fontSize: "10px", letterSpacing: "1px", fontWeight: "bold" }}>
-              ACCOUNT BALANCES:
-          </span>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {balances.length === 0 ? (
-              <div style={{ color: "#555", fontStyle: "italic" }}>No positive balances found or loading...</div>
-              ) : (
-              balances.map((token) => {
-                  const formattedBalance = (Number(token.balance) / Math.pow(10, token.decimals)).toFixed(4);
+        <span style={{ color: "#666", display: "block", marginBottom: "12px", fontSize: "10px", letterSpacing: "1px", fontWeight: "bold" }}>
+            ACCOUNT BALANCES:
+        </span>
+        
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {isConnected ? (
+                // SAFE CHECK: Defends your layout if balances is null/undefined or not an array
+                (!balances || !Array.isArray(balances) || balances.length === 0) ? (
+                <div style={{ color: "#555", fontStyle: "italic" }}>No positive balances found or loading...</div>
+                ) : (
+                    balances.map((token, index) => {
+                        // COMPLIANCE FALLBACKS: Prevents calculation explosions if properties are missing
+                        const rawBalance = token?.balance || "0";
+                        const decimals = typeof token?.decimals === "number" ? token.decimals : 18; 
+                        const symbol = token?.symbol || "UNKNOWN";
+                        const chain = token?.chain || "network";
+                        const uniqueKey = token?.address ? `${chain}-${token.address}` : `${chain}-${symbol}-${index}`;
 
-                  return (
-                  <div 
-                      key={`${token.chain}-${token.address}`} 
-                      style={{ 
-                      display: "flex", 
-                      justifyContent: "space-between", 
-                      alignItems: "center",
-                      borderBottom: "1px solid rgba(255, 255, 255, 0.03)",
-                      paddingBottom: "6px"
-                      }}
-                  >
-                      <div>
-                      <span style={{ color: "#ffffff", fontWeight: "600", marginRight: "6px" }}>
-                          {token.symbol}
-                      </span>
-                      <span style={{ color: "#444", fontSize: "9px", textTransform: "uppercase", background: "rgba(255,255,255,0.05)", padding: "1px 4px", borderRadius: "3px" }}>
-                          {token.chain}
-                      </span>
-                      </div>
-                      
-                      <b style={{ color: "#d3d3d3", fontSize: "13px", fontWeight: "bold", fontFamily: "monospace" }}>
-                      {formattedBalance}
-                      </b>
-                  </div>
-                  );
-              })
-              )}
-          </div>
+                        let formattedBalance = "0.0000";
+
+                        try {
+                        // HYBRID INT MATH: Uses floating strings if parsing a massive native BigInt string
+                        if (typeof rawBalance === 'string' && rawBalance.length > 15) {
+                            const pad = rawBalance.padStart(decimals + 1, '0');
+                            const splitIdx = pad.length - decimals;
+                            const whole = pad.slice(0, splitIdx);
+                            const fraction = pad.slice(splitIdx, splitIdx + 4); // Capture up to 4 decimal places
+                            formattedBalance = `${Number(whole).toLocaleString()}.${fraction}`;
+                        } else {
+                            formattedBalance = (Number(rawBalance) / Math.pow(10, decimals)).toFixed(4);
+                        }
+                        } catch (mathErr) {
+                        console.error("Balance parser engine failed:", mathErr);
+                        formattedBalance = "0.0000";
+                        }
+
+                        return (
+                        <div 
+                            key={uniqueKey} 
+                            style={{ 
+                            display: "flex", 
+                            justifyContent: "space-between", 
+                            alignItems: "center",
+                            borderBottom: "1px solid rgba(255, 255, 255, 0.03)",
+                            paddingBottom: "6px"
+                            }}
+                        >
+                            <div>
+                            <span style={{ color: "#888", fontSize: "9px", textTransform: "uppercase", background: "rgba(255,255,255,0.05)", padding: "1px 4px", borderRadius: "3px" }}>
+                                {chain}
+                            </span>
+                            <span style={{ color: "#ffffff", fontSize: "11px", fontWeight: "600", marginRight: "6px" }}>
+                                {symbol}
+                            </span>
+                            </div>
+                            
+                            <b style={{ color: "#d3d3d3", fontSize: "9px", fontWeight: "bold", fontFamily: "monospace" }}>
+                            {formattedBalance}
+                            </b>
+                        </div>
+                        );
+                    })
+                )
+            ) : (
+                <span style={{ color: "#ef4444", fontWeight: "400", fontSize: "12px" }}>NO WALLET DETECTED</span>
+            )}
+        </div>
         </div>
 
         <hr style={styles.divider} />

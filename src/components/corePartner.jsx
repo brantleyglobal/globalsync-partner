@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
 
-export default function PartnerPortal({ userAddress, activeContract }) {
+export default function PartnerPortal({ userAddress, activeContract, isConnected }) {
   const [partnerOrders, setPartnerOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,7 +16,7 @@ export default function PartnerPortal({ userAddress, activeContract }) {
 
   useEffect(() => {
     const fetchPartnerLedger = async () => {
-      if (!userAddress || !activeContract) return;
+      if (!userAddress || !activeContract || !isConnected) return;
       setLoading(true);
       setError(null);
 
@@ -80,7 +80,7 @@ export default function PartnerPortal({ userAddress, activeContract }) {
                 <div>
                     <h1 style={{ ...styles.title, fontWeight: "100", margin: 0, paddingBottom: "4px" }}>PARTNER PORTAL</h1>
                     <p style={{ ...styles.subtitle, margin: 0 }}>
-                        ACCOUNT STATUS: {userAddress ? (
+                        ACCOUNT STATUS: {isConnected ? (
                         <span style={{ fontFamily: "monospace", color: "#4ade80", fontWeight: "600" }}>ACTIVE</span>
                         ) : (
                         <span style={{ color: "#ef4444", fontWeight: "600" }}>DISCONNECTED</span>
@@ -99,7 +99,7 @@ export default function PartnerPortal({ userAddress, activeContract }) {
                         fontFamily: "monospace",
                         border: "1px solid #111"
                     }}>
-                        {userAddress 
+                        {isConnected && userAddress 
                         ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` 
                         : "0xNone"}
                     </code>
@@ -116,7 +116,7 @@ export default function PartnerPortal({ userAddress, activeContract }) {
       )}
 
       {/* METRIC SUMMARIES */}
-      {userAddress && (
+      {isConnected && userAddress && (
         <div style={{ display: "flex", gap: "16px", marginBottom: "30px" }}>
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0 }}>
             <span style={{ color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "bold", display: "block", marginBottom: "6px" }}>CUMULATIVE VOLUME</span>
