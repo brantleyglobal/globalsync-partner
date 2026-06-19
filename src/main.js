@@ -354,15 +354,18 @@ ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, 
   if (!userAddress || !contractAddress) return [];
 
   try {
-
-    // Re-use your existing ABI or the specific function layout
-    const affiliateAbi = ["function getAffiliateHistory(address user) view returns (tuple(address user, uint256 purchaseIndex, uint256 commission, string commissionHash)[])"];
+    // Verified ABI configuration layout matching struct array return definitions
+    const affiliateAbi = [
+      "function getAffiliateHistory(address user) view returns (tuple(address user, uint256 purchaseIndex, uint256 commission, string commissionHash)[])"
+    ];
+    
+    // Explicit contract instantiation inside secure desktop node container
     const contract = new ethers.Contract(contractAddress, affiliateAbi, providers.globalChain);
 
     const records = await contract.getAffiliateHistory(userAddress);
     
-    // Normalize into safe, clean strings before sending back across the IPC bridge
-    return records.map(rec => ({
+    // Safely normalize raw big integers into strings before streaming across IPC lanes
+    return (records || []).map(rec => ({
       user: rec.user,
       purchaseIndex: rec.purchaseIndex.toString(),
       commission: rec.commission.toString(),
@@ -371,7 +374,7 @@ ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, 
 
   } catch (error) {
     console.error("Backend affiliate log fetch failed:", error);
-    throw error; // Let frontend catch it via the error state
+    throw error; 
   }
 });
 

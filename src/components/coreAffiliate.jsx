@@ -1,6 +1,7 @@
 // src/components/AffiliatePortal.jsx
 import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
+import { deployments } from '../utils/tokensX.js';
 
 export default function AffiliatePortal({ userAddress, activeContract, isConnected }) {
   const [referralRecords, setReferralRecords] = useState([]);
@@ -12,22 +13,69 @@ export default function AffiliatePortal({ userAddress, activeContract, isConnect
     referralCount: 0
   });
 
+  const formatAllocation = (valueBigInt, decimals = 18, precision = 4) => {
+    if (!valueBigInt || valueBigInt === 0n) return "0.0000";
+    const padded = valueBigInt.toString().padStart(decimals + 1, '0');
+    const splitIdx = padded.length - decimals;
+    const integerPart = Number(padded.slice(0, splitIdx)).toLocaleString();
+    const fractionalPart = padded.slice(splitIdx, splitIdx + precision);
+    return `${integerPart}.${fractionalPart}`;
+  };
+
   // Inside your frontend AffiliatePortal.jsx useEffect loop:
   useEffect(() => {
     const fetchAffiliateLogs = async () => {
-      if (!userAddress || !isConnected) return;
+      if (!userAddress || !isConnected) {
+        setReferralRecords([]);
+        setTotals({ totalEarned: 0, referralCount: 0 });
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
       try {
-        // THE CURE: Request data from Node.js, completely bypassing frontend CORS walls
+        // Request data via your Electron IPC bridge handler
         const records = await window.electronAPI.getAffiliateHistory({
           userAddress,
-          contractAddress: "0xYourContractAddressHere", // Pass the target address dynamically or statically
-          chainKey: "polygon" 
+          contractAddress: deployments.AssetPurchase, 
+          chainKey: "global" 
         });
 
-        // ... Proceed with your array mapping, BigInt sorting, and layout formatting state sets ...
+        if (!records || !Array.isArray(records)) {
+          setReferralRecords([]);
+          setTotals({ totalEarned: 0, referralCount: 0 });
+          return;
+        }
+
+        let cumulativeEarnings = 0n;
+        const totalUniqueUsers = new Set();
+
+        const processedRecords = records.map((rec, index) => {
+          const rawCommission = BigInt(rec.commission);
+          cumulativeEarnings += rawCommission;
+          
+          if (rec.user && rec.user !== "0x0000000000000000000000000000000000000000") {
+            totalUniqueUsers.add(rec.user.toLowerCase());
+          }
+
+          return {
+            index: index,
+            buyer: rec.user || "0xUnknown",
+            orderIdx: rec.purchaseIndex || "0",
+            hashRef: rec.commissionHash 
+              ? `${rec.commissionHash.slice(0, 8)}...${rec.commissionHash.slice(-6)}` 
+              : "0x000000",
+            payout: `+${formatAllocation(rawCommission)} GBDo`
+          };
+        });
+
+        setReferralRecords(processedRecords);
+
+        setTotals({
+          totalEarned: parseFloat(formatAllocation(cumulativeEarnings)),
+          referralCount: totalUniqueUsers.size
+        });
 
       } catch (err) {
         console.error("Affiliate ledger read failure:", err);
