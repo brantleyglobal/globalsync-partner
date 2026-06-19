@@ -354,12 +354,10 @@ ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, 
   if (!userAddress || !contractAddress) return [];
 
   try {
-    const provider = providers[chainKey || 'polygon']; // Use appropriate network provider
-    if (!provider) throw new Error("Provider not configured");
 
     // Re-use your existing ABI or the specific function layout
     const affiliateAbi = ["function getAffiliateHistory(address user) view returns (tuple(address user, uint256 purchaseIndex, uint256 commission, string commissionHash)[])"];
-    const contract = new ethers.Contract(contractAddress, affiliateAbi, provider);
+    const contract = new ethers.Contract(contractAddress, affiliateAbi, providers.globalChain);
 
     const records = await contract.getAffiliateHistory(userAddress);
     
@@ -378,24 +376,21 @@ ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, 
 });
 
 // Add this under your existing handlers in main.js
+// Inside your main Electron process file where context bridges are set up
 ipcMain.handle('blockchain:get-partner-ledger', async (event, { userAddress, contractAddress, chainKey }) => {
   if (!userAddress || !contractAddress) return [[], []];
 
   try {
-    const provider = providers[chainKey || 'polygon'];
-    if (!provider) throw new Error("Target blockchain provider is unconfigured.");
-
-    // Unified ABI fragment mapping the multi-array tuple returns
     const partnerAbi = [
       "function getUserPurchasesWithCredits(address user) view returns (tuple(uint256 id, uint256 amount, uint256 quantity, uint256 timestamp)[] terms, uint256[] credits)"
     ];
     
-    const contract = new ethers.Contract(contractAddress, partnerAbi, provider);
+    // Assumes providers.globalChain is instantiated inside your secure Node scope
+    const contract = new ethers.Contract(contractAddress, partnerAbi, providers.globalChain);
 
-    // Fetch the dual arrays safely away from browser environment blocks
     const [terms, credits] = await contract.getUserPurchasesWithCredits(userAddress);
     
-    // Normalize big variables into reliable strings before pushing across the bridge
+    // Format big variables safely to strings before shipping across the process channel
     const serializedTerms = (terms || []).map(tx => ({
       id: tx.id.toString(),
       amount: tx.amount.toString(),
@@ -413,42 +408,149 @@ ipcMain.handle('blockchain:get-partner-ledger', async (event, { userAddress, con
   }
 });
 
-ipcMain.handle('blockchain:get-user-overview', async (event, { userAddress, contractAddress, chainKey }) => {
-  if (!userAddress || !contractAddress) return null;
+ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, { 
+  userAddress, 
+  matrixContractAddress, 
+  vaultContractAddress, 
+  ventureContractAddress, 
+  chainKey 
+}) => {
+  if (!userAddress || !matrixContractAddress) return null;
 
   try {
-    const provider = providers[chainKey || 'polygon'];
-    if (!provider) throw new Error("Target chain provider instance unconfigured.");
 
-    const overviewAbi = [
-      "function getUserOverview(address user) view returns (tuple(uint256[] balanceAmount, uint256[] purchases, uint256 timestamp)[])"
+    // 1. Matrix Overview ABI (Static Index [0] Core Blueprint)
+    const matrixAbi = [
+      "function getUserOverview(address user) view returns (tuple(uint256[] balanceAmount, uint256[] vaultDepositAmount, uint256[] ventureDepositAmount, uint256[] vaultWithdrawAmount, uint256[] ventureWithdrawAmount, uint256[] purchases, uint256 timestamp)[])"
     ];
 
-    const contract = new ethers.Contract(contractAddress, overviewAbi, provider);
-    const userOverviews = await contract.getUserOverview(userAddress);
+    // 2. Explicit Vault Contract ABI Specs (Array boundaries set to [7])
+    const vaultAbi = [
+      "function getUserTermCount(address user) view returns (uint256)",
+      "function getUserDepositCount(address user) view returns (uint256)",
+      "function getDepositUser(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address dividend, uint256 quartersCommitted, uint256 startQuarter, uint256 key, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
+      "function getWithdrawalUser(address user, uint256 index) view returns (tuple(address user, address dividendToken, address[7] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 stage, bool autoPay, uint256 userDividendAmount, uint256[7] termSupplyPerStage, uint256[7] poolBalancePerStage, address[7] payoutSetter, uint256[7] amountout, bytes32[7] payoutTxHash))",
+      "function getUserPurchases(address user) view returns (tuple(address user, address token, address purchaseSetter, address refundSetter, uint256 region, uint256 purchaseIndex, uint256 quantity, uint256 id, uint256 timestamp, uint256 amount, uint256 shipping, uint256 customizations, uint256 rate, bool refund, bytes32 purchaseTxHash, bytes32 refundHash, bytes32 configs)[] memory)"
+    ];
 
-    if (!userOverviews || userOverviews.length === 0) return null;
+    // 3. Explicit Venture Contract ABI Specs (Array boundaries explicitly expanded to [39])
+    const ventureAbi = [
+      "function getUserTermCount(address user) view returns (uint256)",
+      "function getUserDepositCount(address user) view returns (uint256)",
+      "function getDepositUser(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address venture, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
+      "function getWithdrawalUser(address user, uint256 index) view returns (tuple(address user, address ventureToken, address[39] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 redemptionPeriod, uint256 stage, bool autoPay, uint256 timestamp, uint256 userDividendAmount, uint256 termTotalSupply, address[39] payoutSetter, uint256[39] principalSlice, uint256[39] amountout, bytes32[39] payoutTxHash))",
+      "function getUserPurchases(address user) view returns (tuple(address user, address token, address purchaseSetter, address refundSetter, uint256 region, uint256 purchaseIndex, uint256 quantity, uint256 id, uint256 timestamp, uint256 amount, uint256 shipping, uint256 customizations, uint256 rate, bool refund, bytes32 purchaseTxHash, bytes32 refundHash, bytes32 configs)[] memory)"
+    ];
 
-    const latestState = userOverviews[userOverviews.length - 1];
+    const matrixContract = new ethers.Contract(matrixContractAddress, matrixAbi, providers.globalChain);
+    const vaultContract = vaultContractAddress ? new ethers.Contract(vaultContractAddress, vaultAbi, providers.globalChain) : null;
+    const ventureContract = ventureContractAddress ? new ethers.Contract(ventureContractAddress, ventureAbi, providers.globalChain) : null;
 
-    // GUARANTEES SYSTEM COMPLIANCE: If the required arrays are empty, handle safely
-    if (!latestState.balanceAmount?.length || !latestState.purchases?.length) {
-      return null;
+    // --- EXECUTION PASS 1: CORE SUMMARIES & POOL COUNTERS ---
+    const [
+      userOverviews,
+      vaultDepositCount,
+      vaultPurchasesRaw,
+      ventureDepositCount,
+      venturePurchasesRaw
+    ] = await Promise.all([
+      matrixContract.getUserOverview(userAddress),
+      vaultContract ? vaultContract.getUserPurchases(userAddress) : Promise.resolve([]),
+      ventureContract ? ventureContract.getUserPurchases(userAddress) : Promise.resolve([])
+    ]);
+
+    // --- EXECUTION PASS 2: HISTORICAL STRUCT ARRAY LOOPS ---
+    const vaultDepositPromises = Array.from({ length: Number(vaultDepositCount) }, (_, i) => vaultContract.getDepositUser(userAddress, i));
+    const vaultWithdrawalPromises = Array.from({ length: Number(vaultTermCount) }, (_, i) => vaultContract.getWithdrawalUser(userAddress, i));
+    
+    const ventureDepositPromises = Array.from({ length: Number(ventureDepositCount) }, (_, i) => ventureContract.getDepositUser(userAddress, i));
+    const ventureWithdrawalPromises = Array.from({ length: Number(ventureTermCount) }, (_, i) => ventureContract.getWithdrawalUser(userAddress, i));
+
+    const [
+      vaultDepositsRaw,
+      vaultWithdrawalsRaw,
+      ventureDepositsRaw,
+      ventureWithdrawalsRaw
+    ] = await Promise.all([
+      Promise.all(vaultDepositPromises),
+      Promise.all(vaultWithdrawalPromises),
+      Promise.all(ventureDepositPromises),
+      Promise.all(ventureWithdrawalPromises)
+    ]);
+
+    // --- PHASE 3: ISOLATED MAPPING & DATA CLEANING ---
+    // Core Shared Purchase Cleaner
+    const mapPurchases = (rawArr) => (rawArr || []).map((p) => ({
+      user: p.user, token: p.token, purchaseSetter: p.purchaseSetter, refundSetter: p.refundSetter,
+      region: p.region.toString(), purchaseIndex: p.purchaseIndex.toString(), quantity: p.quantity.toString(),
+      id: p.id.toString(), timestamp: p.timestamp.toString(), amount: p.amount.toString(),
+      shipping: p.shipping.toString(), customizations: p.customizations.toString(), rate: p.rate.toString(),
+      refund: p.refund, purchaseTxHash: p.purchaseTxHash, refundHash: p.refundHash, configs: p.configs
+    }));
+
+    // Vault Specific Serialization Mapping
+    const mapVaultDeposits = (rawArr) => (rawArr || []).map((d) => ({
+      timestamp: d.timestamp.toString(), amountin: d.amountin.toString(), amountout: d.amountout.toString(), rate: d.rate.toString(),
+      user: d.user, token: d.token, dividend: d.dividend, quartersCommitted: d.quartersCommitted.toString(),
+      startQuarter: d.startQuarter.toString(), key: d.key.toString(), depositTxHash: d.depositTxHash, refundHash: d.refundHash, refund: d.refund
+    }));
+
+    const mapVaultWithdrawals = (rawArr) => (rawArr || []).map((w) => ({
+      user: w.user, dividendToken: w.dividendToken, payToken: w.payToken, quartersCommitted: w.quartersCommitted.toString(),
+      startQuarter: w.startQuarter.toString(), unlockQuarter: w.unlockQuarter.toString(), stage: w.stage.toString(), autoPay: w.autoPay,
+      userDividendAmount: w.userDividendAmount.toString(), termSupplyPerStage: w.termSupplyPerStage.map(v => v.toString()),
+      poolBalancePerStage: w.poolBalancePerStage.map(v => v.toString()), payoutSetter: w.payoutSetter, amountout: w.amountout.map(v => v.toString()), payoutTxHash: w.payoutTxHash
+    }));
+
+    // Venture Specific Serialization Mapping
+    const mapVentureDeposits = (rawArr) => (rawArr || []).map((d) => ({
+      timestamp: d.timestamp.toString(), amountin: d.amountin.toString(), amountout: d.amountout.toString(), rate: d.rate.toString(),
+      user: d.user, token: d.token, venture: d.venture, depositTxHash: d.depositTxHash, refundHash: d.refundHash, refund: d.refund
+    }));
+
+    const mapVentureWithdrawals = (rawArr) => (rawArr || []).map((w) => ({
+      user: w.user, ventureToken: w.ventureToken, payToken: w.payToken, // Array size 39
+      quartersCommitted: w.quartersCommitted.toString(), startQuarter: w.startQuarter.toString(), unlockQuarter: w.unlockQuarter.toString(),
+      redemptionPeriod: w.redemptionPeriod.toString(), stage: w.stage.toString(), autoPay: w.autoPay, timestamp: w.timestamp.toString(),
+      userDividendAmount: w.userDividendAmount.toString(), termTotalSupply: w.termTotalSupply.toString(), payoutSetter: w.payoutSetter, // Array size 39
+      principalSlice: w.principalSlice.map(v => v.toString()), // Array size 39
+      amountout: w.amountout.map(v => v.toString()), // Array size 39
+      payoutTxHash: w.payoutTxHash // Array size 39
+    }));
+
+    // Matrix Struct [0] Verification Checks
+    let overviewData = null;
+    if (userOverviews && userOverviews.length > 0) {
+      const latestState = userOverviews[userOverviews.length - 1];
+      if (latestState.balanceAmount?.length && latestState.purchases?.length) {
+        overviewData = {
+          balance: latestState.balanceAmount[0].toString(),
+          vaultDeposit: latestState.vaultDepositAmount[0].toString(),
+          ventureDeposit: latestState.ventureDepositAmount[0].toString(),
+          vaultWithdraw: latestState.vaultWithdrawAmount[0].toString(),
+          ventureWithdraw: latestState.ventureWithdrawAmount[0].toString(),
+          purchase: latestState.purchases[0].toString(),
+          timestamp: latestState.timestamp ? latestState.timestamp.toString() : "0"
+        };
+      }
     }
 
-    // DESIGN REQUIREMENT: Preserved exactly as requested
-    const rawBalance = latestState.balanceAmount[0];
-    const rawPurchase = latestState.purchases[0];
-    const timestamp = latestState.timestamp;
-
     return {
-      balance: rawBalance.toString(),
-      purchase: rawPurchase.toString(),
-      timestamp: timestamp ? timestamp.toString() : "0"
+      overview: overviewData,
+      vaultStats: {
+        purchases: mapPurchases(vaultPurchasesRaw),
+        deposits: mapVaultDeposits(vaultDepositsRaw),
+        withdrawals: mapVaultWithdrawals(vaultWithdrawalsRaw)
+      },
+      ventureStats: {
+        purchases: mapPurchases(venturePurchasesRaw),
+        deposits: mapVentureDeposits(ventureDepositsRaw),
+        withdrawals: mapVentureWithdrawals(ventureWithdrawalsRaw)
+      }
     };
 
   } catch (error) {
-    console.error("Backend investment matrix processing failed:", error);
+    console.error("Backend dual-ABI portfolio serialization processing crashed:", error);
     throw error;
   }
 });

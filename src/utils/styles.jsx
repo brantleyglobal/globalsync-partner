@@ -11,7 +11,7 @@ export const styles = {
   },
   sidebar: {
     width: "300px",
-    background: "#021b09",
+    background: "#021b0979",
     borderRight: "1px solid #1a1a1a",
     padding: "30px 24px",
     display: "flex",
@@ -37,15 +37,16 @@ export const styles = {
     color: "#ffffff",
   },
   subtitle: {
-    fontSize: "11px",
+    fontSize: "10px",
     color: "#666666",
     letterSpacing: "1px",
+    fontWeight: "600"
   },
   divider: {
     border: "0",
     height: "1px",
     background: "#1a1a1a",
-    margin: "15px 0 25px 0",
+    margin: "8px 0 15px 0",
   },
   configSection: {
     display: "flex",
@@ -97,13 +98,14 @@ export const styles = {
   mainContent: {
     flex: 1,
     padding: "40px",
+    paddingTop: "10px",
     overflowY: "auto",
     boxSizing: "border-box",
     height: "100vh"
   },
   gridContainer: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
     gap: "30px",
     alignItems: "start",
   },
@@ -125,9 +127,10 @@ export const styles = {
     letterSpacing: "1px",
     margin: "0 0 24px 0",
     color: "#ffffff",
-    borderBottom: "1px solid #161616",
-    paddingBottom: "12px",
-    textTransform: "uppercase"
+    //borderBottom: "1px solid #161616",
+    paddingBottom: "8px",
+    textTransform: "uppercase",
+    marginBottom: "0px"
   },
   formRow: {
     display: "flex",
@@ -141,17 +144,18 @@ export const styles = {
   },
   label: {
     fontSize: "10px",
-    fontWeight: "600",
+    fontWeight: "200",
     color: "#666666",
     letterSpacing: "1px",
     marginBottom: "6px",
+    marginTop: "8px"
   },
   inputElement: {
     background: "#121212",
     border: "1px solid #222222",
     borderRadius: "6px",
     color: "#ffffff",
-    padding: "6px",
+    padding: "8px",
     fontSize: "13px",
     marginBottom: "16px",
     width: "100%",
@@ -159,12 +163,12 @@ export const styles = {
     outline: "none",
   },
   btnForestGreen: {
-    background: "#021b0996",
+    background: "#021b0979",
     color: "#ffffff",
-    border: "none",
+    border: "1px solid #000000b6",
     borderRadius: "6px",
     padding: "8px",
-    fontWeight: "600",
+    fontWeight: "200",
     fontSize: "12px",
     letterSpacing: "1px",
     cursor: "pointer",

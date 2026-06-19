@@ -44,6 +44,13 @@ export default function Sidebar({
     if (authMethod === 'mnemonic') secretToSend = mnemonicPhrase;
 
     const result = await onConnectWallet(authMethod, secretToSend, keystorePassword);
+    console.log("Closing Sign-In Modal");
+    if (result.success) {
+      
+      // Close out the toggle parameters to minimize cleartext layout remnants
+      setShowAuthDrawer(false); 
+      setIsOpen(false);
+    }
   };
 
   const handleDisconnectWallet = async () => {
@@ -54,6 +61,7 @@ export default function Sidebar({
       
       // Close out the toggle parameters to minimize cleartext layout remnants
       setShowAuthDrawer(false); 
+      setIsOpen(false);
     }
   };
 
@@ -98,7 +106,7 @@ export default function Sidebar({
           </div>
         </div>
         
-        <hr style={styles.divider} />
+        {/*<hr style={styles.divider} />*/}
         
         {/* 1. SIGN-IN / CREDENTIALS DRAWER */}
         <div style={{ display: "flex", flexDirection: "column", fontFamily: "system-ui, sans-serif", margin: "0 12px 16px 12px" }}>
@@ -113,7 +121,7 @@ export default function Sidebar({
                 borderTop: "1px solid #1a1a1a",
                 borderBottom: showAuthDrawer ? "none" : "1px solid #1a1a1a",
                 transition: "color 0.2s ease",
-                color: showAuthDrawer ? "#4ade80" : "#555" 
+                color: showAuthDrawer ? "#4ade807a" : "#555" 
               }}
           >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", letterSpacing: "1px", fontWeight: "600" }}>
@@ -124,7 +132,7 @@ export default function Sidebar({
                   background: showAuthDrawer ? "#4ade80" : "#333",
                   boxShadow: showAuthDrawer ? "0 0 8px #4ade80" : "none"
               }} />
-              SIGN IN & CREDENTIALS
+              CONNECT WALLET
               </div>
               <span style={{ fontSize: "9px", transform: showAuthDrawer ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", opacity: 0.5 }}>
               ▼
@@ -267,10 +275,10 @@ export default function Sidebar({
           )}
         </div>
 
-        <hr style={styles.divider} />
+        {/*<hr style={styles.divider} />*/}
 
         {/* PORTAL VIEW SELECTION SYSTEM */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "0 12px 16px 12px", fontFamily: "system-ui" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "0 12px 16px 12px", marginTop: "30px", fontFamily: "system-ui" }}>
           <span style={{ color: "#444", fontSize: "10px", letterSpacing: "1px", fontWeight: "bold", marginBottom: "4px" }}>
             <span style={{ 
                   width: "6px", 
@@ -294,7 +302,7 @@ export default function Sidebar({
               padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
               }}
           >
-              Core Admin Engine
+              Administrative Dashboard
           </button>
 
           <button 
@@ -327,13 +335,13 @@ export default function Sidebar({
               onClick={() => setPortalView('investments')}
               style={{
               ...styles.navItem, 
-              background: portalView === 'investments' ? "rgba(74, 222, 128, 0.08)" : "transparent",
-              color: portalView === 'investments' ? "#4ade80" : "#777",
-              border: "1px solid " + (portalView === 'investments' ? "rgba(74, 222, 128, 0.2)" : "transparent"),
+              background: portalView === 'investments' ? "rgba(0, 0, 0, 0.36)" : "transparent",
+              color: portalView === 'investments' ? "#5b6b5f" : "#777",
+              border: "1px solid " + (portalView === 'investments' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
               padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
               }}
           >
-              Investment Portfolio Matrix
+              Investor Matrix
           </button>
         </div>
 
@@ -413,7 +421,7 @@ export default function Sidebar({
                     })
                 )
             ) : (
-                <span style={{ color: "#ef4444", fontWeight: "400", fontSize: "12px" }}>NO WALLET DETECTED</span>
+                <span style={{ color: "#ef4444", fontWeight: "400", fontSize: "10px" }}>NO WALLET DETECTED</span>
             )}
         </div>
         </div>
@@ -438,18 +446,18 @@ export default function Sidebar({
                 cursor: "pointer",
                 borderTop: "1px solid #1a1a1a", 
                 transition: "color 0.2s ease",
-                color: isOpen ? "#f87171" : "#555" 
+                color: isOpen ? "#8b2424" : "#555" 
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = isOpen ? "#f87171" : "#888"}
-            onMouseLeave={(e) => e.currentTarget.style.color = isOpen ? "#f87171" : "#555"}
+            onMouseEnter={(e) => e.currentTarget.style.color = isOpen ? "#8b2424" : "#888"}
+            onMouseLeave={(e) => e.currentTarget.style.color = isOpen ? "#8b2424" : "#555"}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", letterSpacing: "1px", fontWeight: "600" }}>
                   <span style={{ 
                   width: "6px", 
                   height: "6px", 
                   borderRadius: "50%", 
-                  background: isOpen ? "#f87171" : "#333",
-                  boxShadow: isOpen ? "0 0 8px #f87171" : "none",
+                  background: isOpen ? "#8b2424" : "#333",
+                  boxShadow: isOpen ? "0 0 8px #8b2424" : "none",
                   display: "inline-block"
                   }} />
                   OPERATIONAL COMPLIANCE
@@ -472,10 +480,7 @@ export default function Sidebar({
                 Blockchain structures inherently allow open verification of any cryptographic address. 
                 </p>
                 <p style={{ margin: "0 0 8px 0", color: "#b5b5b5" }}>
-                However, executing asset purchases or routing settlement credits for managed nodes <b style={{ color: "#f87171", fontWeight: "500" }}>will fail</b> without an active, verified account relationship established directly with BG Company.
-                </p>
-                <p style={{ margin: "0", color: "#555", fontStyle: "italic" }}>
-                Enforcing strict off-chain mapping is required prior to execution.
+                However, attempting to submit asset purchases or obtaining settlement credits <b style={{ color: "#8b2424", fontWeight: "500" }}>will fail </b> without an active account verified and processed by BG Company.
                 </p>
             </div>
             )}
