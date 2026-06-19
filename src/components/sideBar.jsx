@@ -284,6 +284,7 @@ export default function Sidebar({
                   width: "6px", 
                   height: "6px", 
                   borderRadius: "50%", 
+                  fontWeight: "lighter",
                   background: showAuthDrawer ? "#050505" : "#333",
                   boxShadow: showAuthDrawer ? "0 0 8px #131614" : "none",
                   borderTop: "1px solid #1a1a1a",
@@ -299,10 +300,10 @@ export default function Sidebar({
               background: portalView === 'admin' ? "rgba(0, 0, 0, 0.36)" : "transparent",
               color: portalView === 'admin' ? "#5b6b5f" : "#777",
               border: "1px solid " + (portalView === 'admin' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
-              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
+              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
               }}
           >
-              Administrative Dashboard
+              ADMINISTRATIVE DASHBOARD
           </button>
 
           <button 
@@ -312,10 +313,10 @@ export default function Sidebar({
               background: portalView === 'affiliate' ? "rgba(0, 0, 0, 0.36)" : "transparent",
               color: portalView === 'affiliate' ? "#5b6b5f" : "#777",
               border: "1px solid " + (portalView === 'affiliate' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
-              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
+              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
               }}
           >
-              Affiliate Matrix
+              AFFILIATE MATRIX
           </button>
 
           <button 
@@ -325,10 +326,10 @@ export default function Sidebar({
               background: portalView === 'wholesale' ? "rgba(0, 0, 0, 0.36)" : "transparent",
               color: portalView === 'wholesale' ? "#5b6b5f" : "#777",
               border: "1px solid " + (portalView === 'wholesale' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
-              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
+              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
               }}
           >
-              Wholesale Partner Matrix
+              WHOLESALER MATRIX
           </button>
 
           <button 
@@ -338,10 +339,10 @@ export default function Sidebar({
               background: portalView === 'investments' ? "rgba(0, 0, 0, 0.36)" : "transparent",
               color: portalView === 'investments' ? "#5b6b5f" : "#777",
               border: "1px solid " + (portalView === 'investments' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
-              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "11px", fontWeight: "600", cursor: "pointer"
+              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
               }}
           >
-              Investor Matrix
+              INVESTOR MATRIX
           </button>
         </div>
 
@@ -357,7 +358,7 @@ export default function Sidebar({
         fontSize: "12px",
         fontFamily: "system-ui, sans-serif"
         }}>
-        <span style={{ color: "#666", display: "block", marginBottom: "12px", fontSize: "10px", letterSpacing: "1px", fontWeight: "bold" }}>
+        <span style={{ color: "#666", display: "block", marginBottom: "12px", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter" }}>
             ACCOUNT BALANCES:
         </span>
         
@@ -421,7 +422,7 @@ export default function Sidebar({
                     })
                 )
             ) : (
-                <span style={{ color: "#ef4444", fontWeight: "400", fontSize: "10px" }}>NO WALLET DETECTED</span>
+                <span style={{ color: "#ef4444", fontWeight: "lighter", fontSize: "9px" }}>NO WALLET DETECTED</span>
             )}
         </div>
         </div>
