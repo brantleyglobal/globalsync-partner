@@ -278,19 +278,29 @@ export default function Sidebar({
         {/*<hr style={styles.divider} />*/}
 
         {/* PORTAL VIEW SELECTION SYSTEM */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "0 12px 16px 12px", marginTop: "30px", fontFamily: "system-ui" }}>
-          <span style={{ color: "#444", fontSize: "10px", letterSpacing: "1px", fontWeight: "bold", marginBottom: "4px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "0 12px 16px 12px", marginTop: "30px", fontFamily: "system-ui, sans-serif" }}>
+          <span style={{ 
+            color: "#555", 
+            fontSize: "11px", 
+            letterSpacing: "1px", 
+            fontWeight: "600", 
+            marginBottom: "4px",
+            padding: "10px 4px",
+            borderTop: "1px solid #1a1a1a",
+            borderBottom: showAuthDrawer ? "none" : "1px solid #1a1a1a",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+          }}>
             <span style={{ 
-                  width: "6px", 
-                  height: "6px", 
-                  borderRadius: "50%", 
-                  fontWeight: "lighter",
-                  background: showAuthDrawer ? "#050505" : "#333",
-                  boxShadow: showAuthDrawer ? "0 0 8px #131614" : "none",
-                  borderTop: "1px solid #1a1a1a",
-                  borderBottom: "1px solid #1a1a1a"
-              }} />
-              WORKSPACE PORTALS:
+              width: "6px", 
+              height: "6px", 
+              borderRadius: "50%", 
+              background: isConnected ? "#4ade80" : "#333",
+              boxShadow: isConnected ? "0 0 8px #4ade80" : "none",
+              display: "inline-block"
+            }} />
+            WORKSPACE PORTALS
           </span>
           
           <button 
