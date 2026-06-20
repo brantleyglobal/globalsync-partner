@@ -166,9 +166,8 @@ export default function AffiliatePortal({ userAddress, activeContract, isConnect
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", textAlign: "left" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid #161616", borderTop: "1px solid #161616" }}>
-              <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>PAYOUT RECORD</th>
-              <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>BUYER IDENTITY</th>
-              <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>BUYER TX INDEX</th>
+              <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>BUYER</th>
+              <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>PURCHASE INDEX</th>
               <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>CLEARING HASH</th>
               <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200", textAlign: "right" }}>SETTLED REWARD</th>
             </tr>
@@ -183,14 +182,13 @@ export default function AffiliatePortal({ userAddress, activeContract, isConnect
             ) : (
               referralRecords.map((rec) => (
                 <tr key={`affiliate-row-${rec.index}`} style={{ borderBottom: "1px solid #111111" }}>
-                  <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#888888" }}>REC-AFF-{rec.index.toString().padStart(3, '0')}</td>
                   <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#aaaaaa" }}>
-                    {rec.buyer.slice(0, 6)}...{rec.buyer.slice(-4)}
+                    {rec.user.slice(0, 6)}...{rec.user.slice(-4)}
                   </td>
-                  <td style={{ padding: "12px 8px", textAlign: "center", fontFamily: "monospace" }}>TX-TERM-{rec.orderIdx.padStart(3, '0')}</td>
-                  <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#666666" }}>{rec.hashRef}</td>
+                  <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#888888" }}>{rec.purchaseIndex.toString().padStart(3, '0')}</td>
+                  <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#666666" }}>{rec.commissionHash}</td>
                   <td style={{ padding: "12px 8px", fontFamily: "monospace", textAlign: "right", color: "#1d5c34", fontWeight: "600" }}>
-                    {rec.payout}
+                    {rec.commission}
                   </td>
                 </tr>
               ))

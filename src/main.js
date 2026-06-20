@@ -413,7 +413,8 @@ ipcMain.handle('blockchain:get-partner-ledger', async (event, { userAddress, con
 
 ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, { 
   userAddress, 
-  matrixContractAddress, 
+  matrixContractAddress,
+  purchaseContractAddress,
   vaultContractAddress, 
   ventureContractAddress, 
   chainKey 
@@ -433,7 +434,6 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
       "function getUserDepositCount(address user) view returns (uint256)",
       "function getDepositUser(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address dividend, uint256 quartersCommitted, uint256 startQuarter, uint256 key, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
       "function getWithdrawalUser(address user, uint256 index) view returns (tuple(address user, address dividendToken, address[7] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 stage, bool autoPay, uint256 userDividendAmount, uint256[7] termSupplyPerStage, uint256[7] poolBalancePerStage, address[7] payoutSetter, uint256[7] amountout, bytes32[7] payoutTxHash))",
-      "function getUserPurchases(address user) view returns (tuple(address user, address token, address purchaseSetter, address refundSetter, uint256 region, uint256 purchaseIndex, uint256 quantity, uint256 id, uint256 timestamp, uint256 amount, uint256 shipping, uint256 customizations, uint256 rate, bool refund, bytes32 purchaseTxHash, bytes32 refundHash, bytes32 configs)[] memory)"
     ];
 
     // 3. Explicit Venture Contract ABI Specs (Array boundaries explicitly expanded to [39])
@@ -442,10 +442,15 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
       "function getUserDepositCount(address user) view returns (uint256)",
       "function getDepositUser(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address venture, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
       "function getWithdrawalUser(address user, uint256 index) view returns (tuple(address user, address ventureToken, address[39] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 redemptionPeriod, uint256 stage, bool autoPay, uint256 timestamp, uint256 userDividendAmount, uint256 termTotalSupply, address[39] payoutSetter, uint256[39] principalSlice, uint256[39] amountout, bytes32[39] payoutTxHash))",
+    ];
+
+    const purchaseAbi = [
+      "function getUserTermCount(address user) view returns (uint256)",
       "function getUserPurchases(address user) view returns (tuple(address user, address token, address purchaseSetter, address refundSetter, uint256 region, uint256 purchaseIndex, uint256 quantity, uint256 id, uint256 timestamp, uint256 amount, uint256 shipping, uint256 customizations, uint256 rate, bool refund, bytes32 purchaseTxHash, bytes32 refundHash, bytes32 configs)[] memory)"
     ];
 
     const matrixContract = new ethers.Contract(matrixContractAddress, matrixAbi, providers.globalChain);
+    const purchaseContract = purchaseContractAddress ? new ethers.Contract(purchaseContractAddress, purchaseAbi, providers.globalChain) : null;
     const vaultContract = vaultContractAddress ? new ethers.Contract(vaultContractAddress, vaultAbi, providers.globalChain) : null;
     const ventureContract = ventureContractAddress ? new ethers.Contract(ventureContractAddress, ventureAbi, providers.globalChain) : null;
 
@@ -453,28 +458,46 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
     const [
       userOverviews,
       vaultDepositCount,
-      vaultPurchasesRaw,
+      vaultTermCount,
+      vaultDeposits,
+      vaultWithdrawals,
       ventureDepositCount,
-      venturePurchasesRaw
+      ventureTermCount,
+      ventureDeposits,
+      ventureWithdrawals,
+      purchaseTermCount,
+      PurchasesRaw
     ] = await Promise.all([
       matrixContract.getUserOverview(userAddress),
-      vaultContract ? vaultContract.getUserPurchases(userAddress) : Promise.resolve([]),
-      ventureContract ? ventureContract.getUserPurchases(userAddress) : Promise.resolve([])
+      vaultContract ? vaultContract.getUserDepositCount(userAddress) : Promise.resolve(0n),
+      vaultContract ? vaultContract.getUserTermCount(userAddress) : Promise.resolve(0n),
+      vaultContract ? vaultContract.getUserDeposit(userAddress) : Promise.resolve([]),
+      vaultContract ? vaultContract.getUserWithdrawals(userAddress) : Promise.resolve([]),
+      ventureContract ? ventureContract.getUserDepositCount(userAddress) : Promise.resolve(0n),
+      ventureContract ? ventureContract.getUserTermCount(userAddress) : Promise.resolve(0n),
+      ventureContract ? ventureContract.getUserDeposit(userAddress) : Promise.resolve([]),
+      ventureContract ? ventureContract.getUserWithdrawals(userAddress) : Promise.resolve([]),
+      purchaseContract ? purchaseContract.getUserTermCount(userAddress) : Promise.resolve(0n),
+      purchaseContract ? purchaseContract.getUserPurchases(userAddress) : Promise.resolve([])
     ]);
 
     // --- EXECUTION PASS 2: HISTORICAL STRUCT ARRAY LOOPS ---
-    const vaultDepositPromises = Array.from({ length: Number(vaultDepositCount) }, (_, i) => vaultContract.getDepositUser(userAddress, i));
-    const vaultWithdrawalPromises = Array.from({ length: Number(vaultTermCount) }, (_, i) => vaultContract.getWithdrawalUser(userAddress, i));
+    const purchasePromises = Array.from({ length: Number(purchaseTermCount - 1) }, (_, i) => vaultContract.getUserPurchases(userAddress, i));
+
+    const vaultDepositPromises = Array.from({ length: Number(vaultDepositCount - 1) }, (_, i) => vaultContract.getUserDeposit(userAddress, i));
+    const vaultWithdrawalPromises = Array.from({ length: Number(vaultTermCount - 1) }, (_, i) => vaultContract.getUserWithdrawals(userAddress, i));
     
-    const ventureDepositPromises = Array.from({ length: Number(ventureDepositCount) }, (_, i) => ventureContract.getDepositUser(userAddress, i));
-    const ventureWithdrawalPromises = Array.from({ length: Number(ventureTermCount) }, (_, i) => ventureContract.getWithdrawalUser(userAddress, i));
+    const ventureDepositPromises = Array.from({ length: Number(ventureDepositCount - 1) }, (_, i) => ventureContract.getUserDeposit(userAddress, i));
+    const ventureWithdrawalPromises = Array.from({ length: Number(ventureTermCount - 1) }, (_, i) => ventureContract.getUserWithdrawals(userAddress, i));
 
     const [
+      purchasesRaw,
       vaultDepositsRaw,
       vaultWithdrawalsRaw,
       ventureDepositsRaw,
       ventureWithdrawalsRaw
     ] = await Promise.all([
+      Promise.all(purchasePromises),
       Promise.all(vaultDepositPromises),
       Promise.all(vaultWithdrawalPromises),
       Promise.all(ventureDepositPromises),
@@ -508,7 +531,7 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
     // Venture Specific Serialization Mapping
     const mapVentureDeposits = (rawArr) => (rawArr || []).map((d) => ({
       timestamp: d.timestamp.toString(), amountin: d.amountin.toString(), amountout: d.amountout.toString(), rate: d.rate.toString(),
-      user: d.user, token: d.token, venture: d.venture, depositTxHash: d.depositTxHash, refundHash: d.refundHash, refund: d.refund
+      user: d.user, token: d.token, venture: d.ventureToken, depositTxHash: d.depositTxHash, refundHash: d.refundHash, refund: d.refund
     }));
 
     const mapVentureWithdrawals = (rawArr) => (rawArr || []).map((w) => ({
@@ -541,14 +564,15 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
     return {
       overview: overviewData,
       vaultStats: {
-        purchases: mapPurchases(vaultPurchasesRaw),
         deposits: mapVaultDeposits(vaultDepositsRaw),
         withdrawals: mapVaultWithdrawals(vaultWithdrawalsRaw)
       },
       ventureStats: {
-        purchases: mapPurchases(venturePurchasesRaw),
         deposits: mapVentureDeposits(ventureDepositsRaw),
         withdrawals: mapVentureWithdrawals(ventureWithdrawalsRaw)
+      },
+      purchaseStats: {
+        purchases: mapPurchases(PurchasesRaw),
       }
     };
 

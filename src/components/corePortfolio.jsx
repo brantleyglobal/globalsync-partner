@@ -194,7 +194,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                 <tr style={{ borderBottom: "1px solid #111111" }}>
                   {/* COL 1: TOTAL PURCHASES COUNT */}
                   <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#888888" }}>
-                    {allPurchases.length} Logged
+                    {purchaseTotal}
                   </td>
 
                   {/* COL 2: VAULT DEPOSIT AGGREGATE TOTAL */}
@@ -342,13 +342,12 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 2: COMMITMENT START */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
-                      Q{d.startQuarter || "1"} 
-                      {d.venture && <span style={{ display: "block", fontSize: "10px", color: "#555", fontFamily: "monospace" }}>Node: {`${d.venture.slice(0, 6)}...${d.venture.slice(-4)}`}</span>}
+                      Q${(d.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
                     </td>
                     
                     {/* COL 3: COMMITMENT END */}
                     <td style={{ padding: "12px 8px", color: "#bbb" }}>
-                      {d.unlockQuarter ? `Q${d.unlockQuarter}` : d.refund ? <span style={{ color: "#ef4444", fontWeight: "600", fontSize: "11px" }}>REFUNDED</span> : "Active"}
+                      {d.unlockQuarter ? `Q${(d.unlockQuarter % 4) + 1} ${Math.floor(d.unlockQuarter / 4)}` : d.refund ? <span style={{ color: "#ef4444", fontWeight: "600", fontSize: "11px" }}>REFUNDED</span> : "Active"}
                     </td>
                     
                     {/* COL 4: AMOUNT IN */}
@@ -402,13 +401,12 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 2: COMMITMENT START */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
-                      Q{d.startQuarter || "1"} 
-                      {d.venture && <span style={{ display: "block", fontSize: "10px", color: "#555", fontFamily: "monospace" }}>Node: {`${d.venture.slice(0, 6)}...${d.venture.slice(-4)}`}</span>}
+                      Q${(d.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
                     </td>
                     
                     {/* COL 3: COMMITMENT END */}
                     <td style={{ padding: "12px 8px", color: "#bbb" }}>
-                      {d.unlockQuarter ? `Q${d.unlockQuarter}` : d.refund ? <span style={{ color: "#ef4444", fontWeight: "600", fontSize: "11px" }}>REFUNDED</span> : "Active"}
+                      {d.unlockQuarter ? `Q${(d.unlockQuarter % 4) + 1} ${Math.floor(d.unlockQuarter / 4)}` : d.refund ? <span style={{ color: "#ef4444", fontWeight: "600", fontSize: "11px" }}>REFUNDED</span> : "Active"}
                     </td>
                     
                     {/* COL 4: AMOUNT IN */}
@@ -444,6 +442,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                 <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>TIMESTAMP</th>
                 <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>COMMITMENT START</th>
                 <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>COMMITMENT END</th>
+                <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>DIVIDEND TOKEN</th>
                 <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200", textAlign: "right" }}>PAYOUT AMOUNT</th>
               </tr>
             </thead>
@@ -458,21 +457,22 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     {/* COL 1: TIMESTAMP */}
                     <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#888" }}>
                       {w.timestamp ? parseTimestamp(w.timestamp) : "N/A"}
-                      <span style={{ display: "block", fontSize: "10px", color: "#444" }}>STAGE-{w.stage}</span>
                     </td>
                     
                     {/* COL 2: COMMITMENT START */}
                     <td style={{ padding: "12px 8px", color: "#bbb" }}>
-                      Q{w.startQuarter}
-                      <span style={{ display: "block", fontSize: "10px", color: "#444" }}>({w.quartersCommitted} Qtrs Committed)</span>
+                      Q${(d.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
                     </td>
                     
                     {/* COL 3: COMMITMENT END */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
-                      Unlock Q{w.unlockQuarter}
+                      Q${(d.unlockQuarter % 4) + 1} ${Math.floor(d.unlockQuarter / 4)}
+                    </td>
+                    {/* COL 4: DIVIDEND TOKEN */}
+                    <td style={{ padding: "12px 8px", color: "#fff" }}>
                       {w.dividendToken && (
                         <span style={{ display: "block", fontSize: "10px", color: "#555", fontFamily: "monospace" }}>
-                          Tok: {`${w.dividendToken.slice(0, 6)}...${w.dividendToken.slice(-4)}`}
+                          {`${w.dividendToken.slice(0, 6)}...${w.dividendToken.slice(-4)}`}
                         </span>
                       )}
                     </td>
@@ -505,6 +505,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                 <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>TIMESTAMP</th>
                 <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>COMMITMENT START</th>
                 <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>COMMITMENT END</th>
+                <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>VENTURE TOKEN</th>
                 <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200", textAlign: "right" }}>PAYOUT AMOUNT</th>
               </tr>
             </thead>
@@ -519,21 +520,22 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     {/* COL 1: TIMESTAMP */}
                     <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#888" }}>
                       {w.timestamp ? parseTimestamp(w.timestamp) : "N/A"}
-                      <span style={{ display: "block", fontSize: "10px", color: "#444" }}>STAGE-{w.stage}</span>
                     </td>
                     
                     {/* COL 2: COMMITMENT START */}
                     <td style={{ padding: "12px 8px", color: "#bbb" }}>
-                      Q{w.startQuarter}
-                      <span style={{ display: "block", fontSize: "10px", color: "#444" }}>({w.quartersCommitted} Qtrs Committed)</span>
+                      Q${(d.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
                     </td>
                     
                     {/* COL 3: COMMITMENT END */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
-                      Unlock Q{w.unlockQuarter}
-                      {w.dividendToken && (
+                      Q${(d.unlockQuarter % 4) + 1} ${Math.floor(d.unlockQuarter / 4)}
+                    </td>
+                    {/* COL 4: VENTURE TOKEN */}
+                    <td style={{ padding: "12px 8px", color: "#fff" }}>
+                      {w.ventureToken && (
                         <span style={{ display: "block", fontSize: "10px", color: "#555", fontFamily: "monospace" }}>
-                          Tok: {`${w.dividendToken.slice(0, 6)}...${w.dividendToken.slice(-4)}`}
+                          {`${w.ventureToken.slice(0, 6)}...${w.ventureToken.slice(-4)}`}
                         </span>
                       )}
                     </td>
