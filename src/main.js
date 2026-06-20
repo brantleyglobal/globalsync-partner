@@ -432,16 +432,16 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
     const vaultAbi = [
       "function getUserTermCount(address user) view returns (uint256)",
       "function getUserDepositCount(address user) view returns (uint256)",
-      "function getDepositUser(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address dividend, uint256 quartersCommitted, uint256 startQuarter, uint256 key, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
-      "function getWithdrawalUser(address user, uint256 index) view returns (tuple(address user, address dividendToken, address[7] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 stage, bool autoPay, uint256 userDividendAmount, uint256[7] termSupplyPerStage, uint256[7] poolBalancePerStage, address[7] payoutSetter, uint256[7] amountout, bytes32[7] payoutTxHash))",
+      "function getUserDeposit(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address dividend, uint256 quartersCommitted, uint256 startQuarter, uint256 key, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
+      "function getUserWithdrawals(address user, uint256 index) view returns (tuple(address user, address dividendToken, address[7] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 stage, bool autoPay, uint256 userDividendAmount, uint256[7] termSupplyPerStage, uint256[7] poolBalancePerStage, address[7] payoutSetter, uint256[7] amountout, bytes32[7] payoutTxHash))",
     ];
 
     // 3. Explicit Venture Contract ABI Specs (Array boundaries explicitly expanded to [39])
     const ventureAbi = [
       "function getUserTermCount(address user) view returns (uint256)",
       "function getUserDepositCount(address user) view returns (uint256)",
-      "function getDepositUser(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address venture, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
-      "function getWithdrawalUser(address user, uint256 index) view returns (tuple(address user, address ventureToken, address[39] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 redemptionPeriod, uint256 stage, bool autoPay, uint256 timestamp, uint256 userDividendAmount, uint256 termTotalSupply, address[39] payoutSetter, uint256[39] principalSlice, uint256[39] amountout, bytes32[39] payoutTxHash))",
+      "function getUserDeposit(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address venture, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
+      "function getUserWithdrawals(address user, uint256 index) view returns (tuple(address user, address ventureToken, address[39] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 redemptionPeriod, uint256 stage, bool autoPay, uint256 timestamp, uint256 userDividendAmount, uint256 termTotalSupply, address[39] payoutSetter, uint256[39] principalSlice, uint256[39] amountout, bytes32[39] payoutTxHash))",
     ];
 
     const purchaseAbi = [
@@ -482,13 +482,13 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
     ]);
 
     // --- EXECUTION PASS 2: HISTORICAL STRUCT ARRAY LOOPS ---
-    const purchasePromises = Array.from({ length: Number(purchaseTermCount - 1) }, (_, i) => vaultContract.getUserPurchases(userAddress, i));
+    const purchasePromises = Array.from({ length: Number(purchaseTermCount) }, (_, i) => vaultContract.getUserPurchases(userAddress, i));
 
-    const vaultDepositPromises = Array.from({ length: Number(vaultDepositCount - 1) }, (_, i) => vaultContract.getUserDeposit(userAddress, i));
-    const vaultWithdrawalPromises = Array.from({ length: Number(vaultTermCount - 1) }, (_, i) => vaultContract.getUserWithdrawals(userAddress, i));
+    const vaultDepositPromises = Array.from({ length: Number(vaultDepositCount) }, (_, i) => vaultContract.getUserDeposit(userAddress, i));
+    const vaultWithdrawalPromises = Array.from({ length: Number(vaultTermCount) }, (_, i) => vaultContract.getUserWithdrawals(userAddress, i));
     
-    const ventureDepositPromises = Array.from({ length: Number(ventureDepositCount - 1) }, (_, i) => ventureContract.getUserDeposit(userAddress, i));
-    const ventureWithdrawalPromises = Array.from({ length: Number(ventureTermCount - 1) }, (_, i) => ventureContract.getUserWithdrawals(userAddress, i));
+    const ventureDepositPromises = Array.from({ length: Number(ventureDepositCount) }, (_, i) => ventureContract.getUserDeposit(userAddress, i));
+    const ventureWithdrawalPromises = Array.from({ length: Number(ventureTermCount) }, (_, i) => ventureContract.getUserWithdrawals(userAddress, i));
 
     const [
       purchasesRaw,
