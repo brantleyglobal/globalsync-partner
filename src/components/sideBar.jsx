@@ -251,55 +251,55 @@ export default function Sidebar({
                     borderTop: "1px solid #1a1a1a", 
                     paddingTop: "6px" 
                 }}>
-                    <button 
-  type="button" 
-  onClick={async () => {
-    try {
-      console.log("File button tapped. Initiating secure channel handshake...");
-      
-      // We create the payload both as separate arguments AND as a wrapped object
-      // to guarantee compatibility with your preload.js setup
-      const flatArgs = [
-        'FILE_PICKER_BYPASS', 
-        'keystore', 
-        'TRIGGER_OS_FILE_PICKER', 
-        ''
-      ];
-      const objectArg = {
-        address: 'FILE_PICKER_BYPASS',
-        method: 'keystore',
-        secret: 'TRIGGER_OS_FILE_PICKER',
-        password: ''
-      };
+                  <button 
+                    type="button" 
+                    onClick={async () => {
+                      try {
+                        console.log("File button tapped. Initiating secure channel handshake...");
+                        
+                        // We create the payload both as separate arguments AND as a wrapped object
+                        // to guarantee compatibility with your preload.js setup
+                        const flatArgs = [
+                          'FILE_PICKER_BYPASS', 
+                          'keystore', 
+                          'TRIGGER_OS_FILE_PICKER', 
+                          ''
+                        ];
+                        const objectArg = {
+                          address: 'FILE_PICKER_BYPASS',
+                          method: 'keystore',
+                          secret: 'TRIGGER_OS_FILE_PICKER',
+                          password: ''
+                        };
 
-      let response;
+                        let response;
 
-      // 1. Try invoking the function using your exact backend parameter blueprint
-      try {
-        response = await window.electronAPI.saveAdminCredentials(...flatArgs);
-      } catch (err) {
-        // 2. Fallback instantly to the unified object layout if flat args are rejected
-        response = await window.electronAPI.saveAdminCredentials(objectArg);
-      }
-      
-      console.log("Backend response received:", response);
+                        // 1. Try invoking the function using your exact backend parameter blueprint
+                        try {
+                          response = await window.electronAPI.saveAdminCredentials(...flatArgs);
+                        } catch (err) {
+                          // 2. Fallback instantly to the unified object layout if flat args are rejected
+                          response = await window.electronAPI.saveAdminCredentials(objectArg);
+                        }
+                        
+                        console.log("Backend response received:", response);
 
-      if (response?.success && response?.content) {
-        setKeystoreJson(response.content);
-      } else if (response?.error) {
-        alert(`System Notice: ${response.error}`);
-      }
-    } catch (err) {
-      console.error("OS File selector bridge error:", err);
-      alert("Critical: Context bridge handshake failed completely.");
-    }
-  }}
-  style={{ background: "transparent", border: "none", color: "#555", fontSize: "9px", cursor: "pointer", padding: "2px 0" }}
-  onMouseEnter={(e) => e.currentTarget.style.color = "#a5f3fc"}
-  onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
->
-  🗂️ Load .json File
-</button>
+                        if (response?.success && response?.content) {
+                          setKeystoreJson(response.content);
+                        } else if (response?.error) {
+                          alert(`System Notice: ${response.error}`);
+                        }
+                      } catch (err) {
+                        console.error("OS File selector bridge error:", err);
+                        alert("Critical: Context bridge handshake failed completely.");
+                      }
+                    }}
+                    style={{ background: "transparent", border: "none", color: "#555", fontSize: "9px", cursor: "pointer", padding: "2px 0" }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = "#a5f3fc"}
+                    onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+                  >
+                    🗂️ Load .json File
+                  </button>
                     
                     {keystoreJson && (
                     <button 
@@ -310,7 +310,7 @@ export default function Sidebar({
                         Clear Text
                     </button>
                     )}
-                </div>
+                  </div>
                 </div>
 
                 <label style={styles.label}>KEYSTORE PASSWORD</label>
