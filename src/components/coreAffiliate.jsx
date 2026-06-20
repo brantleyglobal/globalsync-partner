@@ -66,14 +66,14 @@ export default function AffiliatePortal({ userAddress, activeContract, isConnect
             hashRef: rec.commissionHash 
               ? `${rec.commissionHash.slice(0, 8)}...${rec.commissionHash.slice(-6)}` 
               : "0x000000",
-            payout: `+${formatAllocation(rawCommission)} GBDo`
+            payout: `+${formatAllocation(rawCommission || "0")} GBDo`
           };
         });
 
         setReferralRecords(processedRecords);
 
         setTotals({
-          totalEarned: parseFloat(formatAllocation(cumulativeEarnings)),
+          totalEarned: parseFloat(formatAllocation(cumulativeEarnings || "0")),
           referralCount: totalUniqueUsers.size
         });
 

@@ -14,6 +14,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
 
   // Granular Contract Struct Arrays for Dynamic Table Generation
   const [investmentAllocation, setInvestmentAllocation] = useState(null);
+  const [purchases, setPurchases] = useState([]);
   const [vaultDeposits, setVaultDeposits] = useState([]);
   const [ventureDeposits, setVentureDeposits] = useState([]);
   const [vaultWithdrawals, setVaultWithdrawals] = useState([]);
@@ -49,7 +50,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
           return;
         }
 
-        const { overview, vaultStats, ventureStats } = data;
+        const { overview, vaultStats, ventureStats, purchaseStats } = data;
 
         // BigInt Parsing Context Format Utility
         const formatAllocation = (bigIntValue) => {
@@ -61,7 +62,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
         const formatRawString = (strValue) => formatAllocation(BigInt(strValue || "0"));
 
         // 1. Map "TO DATE" Headings using safe formatting
-        setOverviewTotal(formatRawString(investmentAllocation?.balance));
+        setOverviewTotal(formatRawString(overview.balance));
         setPurchaseTotal(formatRawString(overview.purchases));
         setVaultDepositTotal(formatRawString(overview.vaultDeposit));
         setVentureDepositTotal(formatRawString(overview.ventureDeposit));
@@ -74,13 +75,14 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
           setInvestmentAllocation({
             register: "TOTAL OUTSTANDING BALANCE",
             classification: "Primary Multi-Vault Yield Node Matrix Asset",
-            balance: formatAllocation(rawBalance)
+            balance: formatAllocation(rawBalance || "0")
           });
         } else {
           setInvestmentAllocation(null);
         }
 
         // 3. Map Vault & Venture Dynamic Data Structural Blocks directly to localized states
+        setAllPurchases(purchaseStats.purchases || []);
         setVaultDeposits(vaultStats.deposits || []);
         setVentureDeposits(ventureStats.deposits || []);
         setVaultWithdrawals(vaultStats.withdrawals || []);
@@ -88,8 +90,9 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
 
         // 4. Combine Vault and Venture Purchase Arrays into one single visual timeline list
         const consolidatedPurchases = [
-          ...(vaultStats.purchases || []).map(p => ({ ...p, source: 'Vault Pool' })),
-          ...(ventureStats.purchases || []).map(p => ({ ...p, source: 'Venture Pool' }))
+          ...(purchaseStats.purchases || []).map(p => ({ ...p, source: 'Purchases' })),
+          ...(vaultStats.deposits || []).map(p => ({ ...p, source: 'Smart Vault' })),
+          ...(ventureStats.deposits || []).map(p => ({ ...p, source: 'Venture Vault' }))
         ];
         setAllPurchases(consolidatedPurchases);
 
@@ -188,7 +191,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
               {!investmentAllocation ? (
                 <tr>
                   {/* Updated colSpan to 6 to fit all totals headers perfectly */}
-                  <td colSpan="6" style={{ padding: "24px 8px", color: "#444444", textAlign: "center", fontStyle: "italic" }}>No active records found...</td>
+                  <td colSpan="5" style={{ padding: "24px 8px", color: "#444444", textAlign: "center", fontStyle: "italic" }}>No active records found...</td>
                 </tr>
               ) : (
                 <tr style={{ borderBottom: "1px solid #111111" }}>
@@ -272,8 +275,8 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
 
                     {/* COL 4: SHIPPING */}
                     <td style={{ padding: "12px 6px", color: "#777", fontSize: '12px' }}>
-                      S: {formatAllocation(BigInt(p.shipping))} 
-                      <span style={{ display: "block", fontSize: "10px", color: "#444" }}>C: {formatAllocation(BigInt(p.customizations))}</span>
+                      S: {formatAllocation(BigInt(p.shipping || "0"))} 
+                      <span style={{ display: "block", fontSize: "10px", color: "#444" }}>C: {formatAllocation(BigInt(p.customizations || "0"))}</span>
                     </td>
 
                     {/* COL 5: REGION */}
@@ -298,7 +301,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
 
                     {/* COL 8: AMOUNT (Aligned Right) */}
                     <td style={{ padding: "12px 6px", fontFamily: "monospace", color: "#fff", fontWeight: "600", textAlign: "right" }}>
-                      {formatAllocation(BigInt(p.amount))}
+                      {formatAllocation(BigInt(p.amount || "0"))}
                     </td>
                   </tr>
                 ))
@@ -342,7 +345,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 2: COMMITMENT START */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
-                      Q${(d.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
+                      Q${(d.startQuarter % 4) + 1} ${Math.floor(d.startQuarter / 4)}
                     </td>
                     
                     {/* COL 3: COMMITMENT END */}
@@ -352,12 +355,12 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 4: AMOUNT IN */}
                     <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#1d5c34", fontWeight: "600" }}>
-                      +{formatAllocation(BigInt(d.amountin))}
+                      +{formatAllocation(BigInt(d.amountin || "0"))}
                     </td>
                     
                     {/* COL 5: AMOUNT OUT (Aligned Right) */}
                     <td style={{ padding: "12px 8px", fontFamily: "monospace", textAlign: "right", color: "#888" }}>
-                      {formatAllocation(BigInt(d.amountout))}
+                      {formatAllocation(BigInt(d.amountout || "0"))}
                     </td>
                   </tr>
                 ))
@@ -401,7 +404,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 2: COMMITMENT START */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
-                      Q${(d.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
+                      Q${(d.startQuarter % 4) + 1} ${Math.floor(d.startQuarter / 4)}
                     </td>
                     
                     {/* COL 3: COMMITMENT END */}
@@ -411,12 +414,12 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 4: AMOUNT IN */}
                     <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#1d5c34", fontWeight: "600" }}>
-                      +{formatAllocation(BigInt(d.amountin))}
+                      +{formatAllocation(BigInt(d.amountin || "0"))}
                     </td>
                     
                     {/* COL 5: AMOUNT OUT (Aligned Right) */}
                     <td style={{ padding: "12px 8px", fontFamily: "monospace", textAlign: "right", color: "#888" }}>
-                      {formatAllocation(BigInt(d.amountout))}
+                      {formatAllocation(BigInt(d.amountout || "0"))}
                     </td>
                   </tr>
                 ))
@@ -461,12 +464,12 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 2: COMMITMENT START */}
                     <td style={{ padding: "12px 8px", color: "#bbb" }}>
-                      Q${(d.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
+                      Q${(w.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
                     </td>
                     
                     {/* COL 3: COMMITMENT END */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
-                      Q${(d.unlockQuarter % 4) + 1} ${Math.floor(d.unlockQuarter / 4)}
+                      Q${(w.unlockQuarter % 4) + 1} ${Math.floor(w.unlockQuarter / 4)}
                     </td>
                     {/* COL 4: DIVIDEND TOKEN */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
@@ -479,7 +482,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 4: PAYOUT AMOUNT (Aligned Right) */}
                     <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#ef4444", textAlign: "right", fontWeight: "600" }}>
-                      -{formatAllocation(BigInt(w.userDividendAmount))}
+                      -{formatAllocation(BigInt(w.userDividendAmount || "0"))}
                     </td>
                   </tr>
                 ))
@@ -524,12 +527,12 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 2: COMMITMENT START */}
                     <td style={{ padding: "12px 8px", color: "#bbb" }}>
-                      Q${(d.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
+                      Q${(w.startQuarter % 4) + 1} ${Math.floor(w.startQuarter / 4)}
                     </td>
                     
                     {/* COL 3: COMMITMENT END */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
-                      Q${(d.unlockQuarter % 4) + 1} ${Math.floor(d.unlockQuarter / 4)}
+                      Q${(w.unlockQuarter % 4) + 1} ${Math.floor(w.unlockQuarter / 4)}
                     </td>
                     {/* COL 4: VENTURE TOKEN */}
                     <td style={{ padding: "12px 8px", color: "#fff" }}>
@@ -542,7 +545,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                     
                     {/* COL 4: PAYOUT AMOUNT (Aligned Right) */}
                     <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#ef4444", textAlign: "right", fontWeight: "600" }}>
-                      -{formatAllocation(BigInt(w.userDividendAmount))}
+                      -{formatAllocation(BigInt(w.userDividendAmount || "0"))}
                     </td>
                   </tr>
                 ))

@@ -71,11 +71,13 @@ export default function PartnerPortal({ userAddress, activeContract, isConnected
 
         setPartnerOrders(dynamicOrders);
 
-        // Convert big integers to numbers cleanly for UI display strings
+        const scaleFactor = 1000000000000000000n; // 10^18
+
         setMetrics({
           totalVolume: cumulativeVolume,
-          settledCost: parseFloat(formatAllocation(cumulativeCost)),
-          totalCredits: parseFloat(formatAllocation(cumulativeCredits))
+          // Division extracts whole units, remainder extracts decimals safely
+          settledCost: Number(cumulativeCost / scaleFactor) + Number(cumulativeCost % scaleFactor) / Number(scaleFactor),
+          totalCredits: Number(cumulativeCredits / scaleFactor) + Number(cumulativeCredits % scaleFactor) / Number(scaleFactor)
         });
 
       } catch (err) {
