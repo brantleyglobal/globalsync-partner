@@ -1,5 +1,5 @@
 // src/components/Sidebar.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
 import logo from '../assets/logo.png';
 
@@ -65,15 +65,46 @@ export default function Sidebar({
     }
   };
 
+  useEffect(() => {
+    // Create a style element dynamically
+    const styleElement = document.createElement("style");
+    styleElement.id = "sidebar-webkit-scroll-shield";
+    styleElement.textContent = `
+      .no-track-scroll::-webkit-scrollbar {
+        display: none !important;
+        width: 0px !important;
+        background: transparent !important;
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    // Cleanup when the component unmounts to prevent memory/style leaks
+    return () => {
+      const existingStyle = document.getElementById("sidebar-webkit-scroll-shield");
+      if (existingStyle) existingStyle.remove();
+    };
+  }, []);
+
   return (
     <aside style={{
-        ...styles.sidebar,
+      ...styles.sidebar,
         display: "flex",
         flexDirection: "column",
         height: "100vh",
-        overflowY: "auto",
-        scrollbarGutter: "stable",
+        
+        // Keeps the mouse wheel / trackpad scrolling engine active
+        overflowY: "scroll", 
+        
+        // Removes the permanent scrollbar track gap entirely
+        scrollbarGutter: "auto", 
+        
+        // Instantly hides the visual scrollbar on Firefox
+        scrollbarWidth: "none",  
+        
+        // Instantly hides the visual scrollbar on IE and old Edge
+        msOverflowStyle: "none", 
     }}>
+
         {/* SIDEBAR HEADER & BRAND CONTAINER */}
         <div style={{
           ...styles.brandContainer, 
@@ -182,50 +213,197 @@ export default function Sidebar({
                   </>
               )}
 
-              {/* OPTION 2: KEYSTORE */}
+              {/* OPTION 2: ENCRYPTED KEYSTORE JSON */}
               {authMethod === 'keystore' && (
-                  <>
-                  <label style={styles.label}>KEYSTORE JSON</label>
-                  <textarea
-                      placeholder='{"version":3,"id":"..."}'
-                      style={styles.sidebarInput}
-                      value={keystoreJson}
-                      onChange={(e) => setKeystoreJson(e.target.value)}
-                  />
+              <>
+                <label style={styles.label}>KEYSTORE JSON</label>
+                <div style={{
+                background: "rgba(0,0,0,0.25)",
+                border: "1px solid #1c1c1c",
+                borderRadius: "4px",
+                padding: "8px",
+                marginBottom: "12px",
+                }}>
+                <textarea
+                    placeholder='{"version":3,"id":"...", "crypto":{...}}'
+                    style={{
+                    width: "100%",
+                    height: "70px",
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    resize: "none",
+                    color: keystoreJson ? "#4ade80" : "#888",
+                    fontSize: "10px",
+                    fontFamily: "monospace",
+                    lineHeight: "1.4",
+                    boxSizing: "border-box"
+                    }}
+                    value={keystoreJson}
+                    onChange={(e) => setKeystoreJson(e.target.value)}
+                />
+                
+                {/* Utilities Action Bar */}
+                <div style={{ 
+                    display: "flex", 
+                    justifyContent: "space-between", 
+                    marginTop: "6px", 
+                    borderTop: "1px solid #1a1a1a", 
+                    paddingTop: "6px" 
+                }}>
+                    <button 
+  type="button" 
+  onClick={async () => {
+    try {
+      console.log("File button tapped. Initiating secure channel handshake...");
+      
+      // We create the payload both as separate arguments AND as a wrapped object
+      // to guarantee compatibility with your preload.js setup
+      const flatArgs = [
+        'FILE_PICKER_BYPASS', 
+        'keystore', 
+        'TRIGGER_OS_FILE_PICKER', 
+        ''
+      ];
+      const objectArg = {
+        address: 'FILE_PICKER_BYPASS',
+        method: 'keystore',
+        secret: 'TRIGGER_OS_FILE_PICKER',
+        password: ''
+      };
 
-                  <label style={{...styles.label, marginTop:'10px'}}>KEYSTORE PASSWORD</label>
-                  <div style={{...styles.cryptoInputWrapper, marginBottom: '16px'}}>
-                      <input
-                        type={showKeystorePass ? "text" : "password"}
-                        placeholder="Password to decrypt keystore"
-                        style={{...styles.sidebarInput, marginBottom: 0, paddingRight: '45px'}}
-                        value={keystorePassword}
-                        onChange={(e) => setKeystorePassword(e.target.value)}
-                      />
-                      <button type="button" onClick={() => setShowKeystorePass(!showKeystorePass)} style={styles.visibilityToggle}>
-                        {showKeystorePass ? "Hide" : "Show"}
-                      </button>
-                  </div>
-                  </>
+      let response;
+
+      // 1. Try invoking the function using your exact backend parameter blueprint
+      try {
+        response = await window.electronAPI.saveAdminCredentials(...flatArgs);
+      } catch (err) {
+        // 2. Fallback instantly to the unified object layout if flat args are rejected
+        response = await window.electronAPI.saveAdminCredentials(objectArg);
+      }
+      
+      console.log("Backend response received:", response);
+
+      if (response?.success && response?.content) {
+        setKeystoreJson(response.content);
+      } else if (response?.error) {
+        alert(`System Notice: ${response.error}`);
+      }
+    } catch (err) {
+      console.error("OS File selector bridge error:", err);
+      alert("Critical: Context bridge handshake failed completely.");
+    }
+  }}
+  style={{ background: "transparent", border: "none", color: "#555", fontSize: "9px", cursor: "pointer", padding: "2px 0" }}
+  onMouseEnter={(e) => e.currentTarget.style.color = "#a5f3fc"}
+  onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+>
+  🗂️ Load .json File
+</button>
+                    
+                    {keystoreJson && (
+                    <button 
+                        type="button" 
+                        onClick={() => setKeystoreJson('')}
+                        style={{ background: "transparent", border: "none", color: "#ef44447a", fontSize: "9px", cursor: "pointer", padding: "2px 0" }}
+                    >
+                        Clear Text
+                    </button>
+                    )}
+                </div>
+                </div>
+
+                <label style={styles.label}>KEYSTORE PASSWORD</label>
+                <div style={{...styles.cryptoInputWrapper, marginBottom: '16px'}}>
+                <input
+                    type={showKeystorePass ? "text" : "password"}
+                    placeholder="Password to decrypt keystore"
+                    style={{...styles.sidebarInput, marginBottom: 0, paddingRight: '45px'}}
+                    value={keystorePassword}
+                    onChange={(e) => setKeystorePassword(e.target.value)}
+                />
+                <button type="button" onClick={() => setShowKeystorePass(!showKeystorePass)} style={styles.visibilityToggle}>
+                    {showKeystorePass ? "Hide" : "Show"}
+                </button>
+                </div>
+              </>
               )}
 
               {/* OPTION 3: MNEMONIC SEED PHRASE */}
               {authMethod === 'mnemonic' && (
-                  <>
-                  <label style={styles.label}>SEED PHRASE (12/24 WORDS)</label>
-                  <div style={{...styles.cryptoInputWrapper, marginBottom: '16px'}}>
-                      <textarea
-                        key={`mnemonic-field-${mnemonicPhrase === ''}`}
-                        placeholder="word1 word2 word3..."
-                        style={{...styles.sidebarInput, height: '70px', paddingRight: '45px', WebkitTextSecurity: showMnemonic ? 'none' : 'disc'}}
+                <>
+                    <label style={styles.label}>SEED PHRASE (12/24 WORDS)</label>
+                    <div style={{
+                    background: "rgba(0,0,0,0.25)",
+                    border: "1px solid #1c1c1c",
+                    borderRadius: "4px",
+                    padding: "8px",
+                    marginBottom: "16px",
+                    minHeight: "75px"
+                    }}>
+                    {mnemonicPhrase.trim() === "" ? (
+                        <textarea
+                        placeholder="Paste or type your 12 or 24-word recovery seed phrase here..."
+                        style={{
+                            width: "100%",
+                            height: "60px",
+                            background: "transparent",
+                            border: "none",
+                            outline: "none",
+                            resize: "none",
+                            color: "#888",
+                            fontSize: "10px",
+                            fontFamily: "system-ui, sans-serif",
+                            lineHeight: "1.4",
+                            boxSizing: "border-box"
+                        }}
                         value={mnemonicPhrase}
                         onChange={(e) => setMnemonicPhrase(e.target.value)}
-                      />
-                      <button type="button" onClick={() => setShowMnemonic(!showMnemonic)} style={{...styles.visibilityToggle, top: '20px'}}>
-                        {showMnemonic ? "Hide" : "Show"}
-                      </button>
-                  </div>
-                  </>
+                        />
+                    ) : (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                        {mnemonicPhrase.trim().split(/\s+/).map((word, idx) => (
+                            <div 
+                            key={idx}
+                            style={{
+                                background: "rgba(255,255,255,0.03)",
+                                border: "1px solid rgba(255,255,255,0.05)",
+                                borderRadius: "3px",
+                                padding: "3px 6px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                fontFamily: "monospace",
+                                fontSize: "9px"
+                            }}
+                            >
+                            <span style={{ color: "#444" }}>{idx + 1}</span>
+                            <span style={{ color: showMnemonic ? "#aaa" : "••••", letterSpacing: showMnemonic ? "normal" : "1px" }}>
+                                {showMnemonic ? word : "••••"}
+                            </span>
+                            </div>
+                        ))}
+                        
+                        <div style={{ width: "100%", display: "flex", justifyContent: "space-between", marginTop: "6px", borderTop: "1px dashed #1a1a1a", paddingTop: "6px" }}>
+                            <button 
+                            type="button" 
+                            onClick={() => setMnemonicPhrase('')}
+                            style={{ background: "transparent", border: "none", color: "#ef44447a", fontSize: "9px", cursor: "pointer", padding: 0 }}
+                            >
+                            Clear Phrase
+                            </button>
+                            <button 
+                            type="button" 
+                            onClick={() => setShowMnemonic(!showMnemonic)}
+                            style={{ background: "transparent", border: "none", color: "#777", fontSize: "9px", cursor: "pointer", padding: 0 }}
+                            >
+                            {showMnemonic ? "Hide Words" : "Reveal Words"}
+                            </button>
+                        </div>
+                        </div>
+                    )}
+                    </div>
+                </>
               )}
 
               {!isConnected &&  ( 

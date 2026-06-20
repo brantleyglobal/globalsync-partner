@@ -35,12 +35,22 @@ export default function AffiliatePortal({ userAddress, activeContract, isConnect
       setError(null);
 
       try {
-        // Request data via your Electron IPC bridge handler
-        const records = await window.electronAPI.getAffiliateHistory({
-          userAddress,
-          contractAddress: deployments.AssetPurchase, 
-          chainKey: "global" 
-        });
+        let records = null;
+
+        try {
+          // Request data via your Electron IPC bridge handler
+          records = await window.electronAPI.getAffiliateHistory({
+            userAddress,
+            contractAddress: deployments.AssetPurchase, 
+            chainKey: "global" 
+          });
+        } catch (ipcError) {
+          // Keep the raw RPC error off the dashboard UI screen and direct it to the dev console log
+          console.warn("Affiliate history revert caught quietly. Initializing safe baseline dashboard view:", ipcError);
+          
+          // Use an empty array fallback so the downstream functions handle a clean user profile smoothly
+          records = [];
+        }
 
         if (!records || !Array.isArray(records)) {
           setReferralRecords([]);

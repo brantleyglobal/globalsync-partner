@@ -4,6 +4,8 @@ process.on('uncaughtException', (error) => {
   dialog.showErrorBox('Main Process Crash', error.stack || error.message);
 });
 
+const fs = require('fs');
+
 // Catch unhandled async promise rejections
 process.on('unhandledRejection', (reason) => {
   dialog.showErrorBox('Unhandled Promise Rejection', String(reason));
@@ -248,22 +250,55 @@ ipcMain.handle('get-admin-status', async () => {
 });
 
 // 2. Holds cleartext inputs strictly inside Node's background RAM variable
-ipcMain.handle('secure-save-credentials', async (event, { address, method, secret, password }) => {
+ipcMain.handle('secure-save-credentials', async (event, ...args) => {
   try {
+    // ELECTRON PARAMETER UNPACKING
+    // This safely extracts your variables regardless of how your preload bridge forwards them
+    let address, method, secret, password;
+
+    if (args[0] && typeof args[0] === 'object' && !Array.isArray(args[0])) {
+      // If the frontend sent a single wrapped object: { address: '...', ... }
+      address = args[0].address;
+      method = args[0].method;
+      secret = args[0].secret;
+      password = args[0].password;
+    } else {
+      // If the frontend sent flat, separate arguments: 'addr', 'meth', 'sec', 'pass'
+      address = args[0];
+      method = args[1];
+      secret = args[2];
+      password = args[3];
+    }
+
+    // 1. INTERCEPT STANDALONE FILE SELECTION CALLS IMMEDIATELY
+    if (secret === 'TRIGGER_OS_FILE_PICKER') {
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        // Completely removed the strict filters array to allow all file extensions (*.*)
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, error: "File selection canceled." };
+      }
+
+      // Read file content from any location on the CPU directly into RAM
+      const fileContent = fs.readFileSync(result.filePaths[0], 'utf-8');
+      return { success: true, content: fileContent };
+    }
+
+    // 2. YOUR ORIGINAL SECURE RAM STORAGE ENGINE
     if (!address || !secret) {
       throw new Error("Critical Exception: Missing address or secret credentials.");
     }
 
-    // Save everything strictly to your system's volatile RAM space
     activeAdminSession = {
       isConnected: true,
       address,
       method,
-      secret,    // Isolated from React/Chromium memory scrapping
-      password   // Kept strictly inside the background runtime
+      secret,    
+      password   
     };
 
-    // Return the absolute truth directly to the frontend response payload
     return { 
       success: true, 
       isConnected: activeAdminSession.isConnected, 
@@ -432,16 +467,16 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
     const vaultAbi = [
       "function getUserTermCount(address user) view returns (uint256)",
       "function getUserDepositCount(address user) view returns (uint256)",
-      "function getUserDeposit(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address dividend, uint256 quartersCommitted, uint256 startQuarter, uint256 key, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
-      "function getUserWithdrawals(address user, uint256 index) view returns (tuple(address user, address dividendToken, address[7] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 stage, bool autoPay, uint256 userDividendAmount, uint256[7] termSupplyPerStage, uint256[7] poolBalancePerStage, address[7] payoutSetter, uint256[7] amountout, bytes32[7] payoutTxHash))",
+      "function getUserDeposit(address user) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address dividend, uint256 quartersCommitted, uint256 startQuarter, uint256 key, bytes32 depositTxHash, bytes32 refundHash, bool refund)[])",
+      "function getUserWithdrawals(address user) view returns (tuple(address user, address dividendToken, address[7] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 stage, bool autoPay, uint256 userDividendAmount, uint256[7] termSupplyPerStage, uint256[7] poolBalancePerStage, address[7] payoutSetter, uint256[7] amountout, bytes32[7] payoutTxHash)[])",
     ];
 
     // 3. Explicit Venture Contract ABI Specs (Array boundaries explicitly expanded to [39])
     const ventureAbi = [
       "function getUserTermCount(address user) view returns (uint256)",
       "function getUserDepositCount(address user) view returns (uint256)",
-      "function getUserDeposit(address user, uint256 index) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address venture, bytes32 depositTxHash, bytes32 refundHash, bool refund))",
-      "function getUserWithdrawals(address user, uint256 index) view returns (tuple(address user, address ventureToken, address[39] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 redemptionPeriod, uint256 stage, bool autoPay, uint256 timestamp, uint256 userDividendAmount, uint256 termTotalSupply, address[39] payoutSetter, uint256[39] principalSlice, uint256[39] amountout, bytes32[39] payoutTxHash))",
+      "function getUserDeposit(address user) view returns (tuple(uint256 timestamp, uint256 amountin, uint256 amountout, uint256 rate, address user, address token, address venture, bytes32 depositTxHash, bytes32 refundHash, bool refund)[])",
+      "function getUserWithdrawals(address user) view returns (tuple(address user, address ventureToken, address[39] payToken, uint256 quartersCommitted, uint256 startQuarter, uint256 unlockQuarter, uint256 redemptionPeriod, uint256 stage, bool autoPay, uint256 timestamp, uint256 userDividendAmount, uint256 termTotalSupply, address[39] payoutSetter, uint256[39] principalSlice, uint256[39] amountout, bytes32[39] payoutTxHash)[])",
     ];
 
     const purchaseAbi = [
@@ -457,6 +492,8 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
     // --- EXECUTION PASS 1: CORE SUMMARIES & POOL COUNTERS ---
     const [
       userOverviews,
+      purchaseTermCount,
+      PurchasesRaw,
       vaultDepositCount,
       vaultTermCount,
       vaultDeposits,
@@ -464,44 +501,19 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
       ventureDepositCount,
       ventureTermCount,
       ventureDeposits,
-      ventureWithdrawals,
-      purchaseTermCount,
-      PurchasesRaw
+      ventureWithdrawals
     ] = await Promise.all([
       matrixContract.getUserOverview(userAddress),
+      purchaseContract ? purchaseContract.getUserTermCount(userAddress) : Promise.resolve(0n),
+      purchaseContract ? purchaseContract.getUserPurchases(userAddress).catch(() => []) : Promise.resolve([]),
       vaultContract ? vaultContract.getUserDepositCount(userAddress) : Promise.resolve(0n),
       vaultContract ? vaultContract.getUserTermCount(userAddress) : Promise.resolve(0n),
-      vaultContract ? vaultContract.getUserDeposit(userAddress) : Promise.resolve([]),
-      vaultContract ? vaultContract.getUserWithdrawals(userAddress) : Promise.resolve([]),
+      vaultContract ? vaultContract.getUserDeposit(userAddress).catch(() => []) : Promise.resolve([]),
+      vaultContract ? vaultContract.getUserWithdrawals(userAddress).catch(() => []) : Promise.resolve([]),
       ventureContract ? ventureContract.getUserDepositCount(userAddress) : Promise.resolve(0n),
       ventureContract ? ventureContract.getUserTermCount(userAddress) : Promise.resolve(0n),
-      ventureContract ? ventureContract.getUserDeposit(userAddress) : Promise.resolve([]),
-      ventureContract ? ventureContract.getUserWithdrawals(userAddress) : Promise.resolve([]),
-      purchaseContract ? purchaseContract.getUserTermCount(userAddress) : Promise.resolve(0n),
-      purchaseContract ? purchaseContract.getUserPurchases(userAddress) : Promise.resolve([])
-    ]);
-
-    // --- EXECUTION PASS 2: HISTORICAL STRUCT ARRAY LOOPS ---
-    const purchasePromises = Array.from({ length: Number(purchaseTermCount) }, (_, i) => vaultContract.getUserPurchases(userAddress, i));
-
-    const vaultDepositPromises = Array.from({ length: Number(vaultDepositCount) }, (_, i) => vaultContract.getUserDeposit(userAddress, i));
-    const vaultWithdrawalPromises = Array.from({ length: Number(vaultTermCount) }, (_, i) => vaultContract.getUserWithdrawals(userAddress, i));
-    
-    const ventureDepositPromises = Array.from({ length: Number(ventureDepositCount) }, (_, i) => ventureContract.getUserDeposit(userAddress, i));
-    const ventureWithdrawalPromises = Array.from({ length: Number(ventureTermCount) }, (_, i) => ventureContract.getUserWithdrawals(userAddress, i));
-
-    const [
-      purchasesRaw,
-      vaultDepositsRaw,
-      vaultWithdrawalsRaw,
-      ventureDepositsRaw,
-      ventureWithdrawalsRaw
-    ] = await Promise.all([
-      Promise.all(purchasePromises),
-      Promise.all(vaultDepositPromises),
-      Promise.all(vaultWithdrawalPromises),
-      Promise.all(ventureDepositPromises),
-      Promise.all(ventureWithdrawalPromises)
+      ventureContract ? ventureContract.getUserDeposit(userAddress).catch(() => []) : Promise.resolve([]),
+      ventureContract ? ventureContract.getUserWithdrawals(userAddress).catch(() => []) : Promise.resolve([])
     ]);
 
     // --- PHASE 3: ISOLATED MAPPING & DATA CLEANING ---

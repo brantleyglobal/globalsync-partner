@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPartnerLedger: (data) =>
     ipcRenderer.invoke('blockchain:get-partner-ledger', data),
 
+  getExpandedPortfolio: (data) =>
+    ipcRenderer.invoke('blockchain:get-user-expanded-portfolio', data),
+
   getUserOverview: (data) =>
   ipcRenderer.invoke('blockchain:get-user-overview', data),
   

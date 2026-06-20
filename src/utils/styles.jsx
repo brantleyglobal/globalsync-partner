@@ -11,7 +11,7 @@ export const styles = {
   },
   sidebar: {
     width: "300px",
-    background: "#021b0979",
+    background: "#01290c8e",
     borderRight: "1px solid #1a1a1a",
     padding: "30px 24px",
     display: "flex",
@@ -163,7 +163,7 @@ export const styles = {
     outline: "none",
   },
   btnForestGreen: {
-    background: "#021b0979",
+    background: "#01290c8e",
     color: "#ffffff",
     border: "1px solid #000000b6",
     borderRadius: "6px",

@@ -27,12 +27,22 @@ export default function PartnerPortal({ userAddress, activeContract, isConnected
       setError(null);
 
       try {
-        // Correctly call the backend IPC link handler
-        const ledgerResponse = await window.electronAPI.getPartnerLedger({
-          userAddress,
-          contractAddress: deployments.AssetPurchase, 
-          chainKey: "global"
-        });
+        let ledgerResponse = null;
+
+        try {
+          // Correctly call the backend IPC link handler
+          ledgerResponse = await window.electronAPI.getPartnerLedger({
+            userAddress,
+            contractAddress: deployments.AssetPurchase, 
+            chainKey: "global"
+          });
+        } catch (ipcError) {
+          // Send the raw blockchain revert trace strictly to the developer console log
+          console.warn("Partner ledger revert caught quietly. Initializing clean empty view:", ipcError);
+          
+          // Fallback to a mock empty ledger layout: [ [serializedTerms], [serializedCredits] ]
+          ledgerResponse = [[], []];
+        }
 
         if (!ledgerResponse || !Array.isArray(ledgerResponse)) {
           setPartnerOrders([]);

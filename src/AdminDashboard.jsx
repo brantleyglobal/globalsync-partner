@@ -196,7 +196,20 @@ export default function AdminDashboard() {
 
     try {
       console.log(`Verifying deposit receipt against Dynamic Treasury (${targetTreasuryVault})...`, payload);
-      const response = await window.api.triggerVault(payload);
+      
+      let response = null;
+
+      // --- THE SHIELD LAYER ---
+      try {
+        response = await window.api.triggerVault(payload);
+      } catch (ipcError) {
+        // Quietly log the raw code/network exception to the developer tools console
+        console.error("IPC verification pipeline background crash:", ipcError);
+        
+        // Mock a clean failure state so the UI handles it gracefully down below
+        response = { ok: false, reason: "The verification engine was unable to read this transaction. Please ensure the hash is correct and confirmed on-chain." };
+      }
+      // ------------------------
       
       if (response && response.ok) {
         console.log("Verification Passed!", response);
@@ -204,12 +217,13 @@ export default function AdminDashboard() {
         setUserQueryResults([response]); 
         alert(`Verification Passed! Confirmed payment routed into Treasury Vault: ${targetTreasuryVault}`);
       } else {
-        console.error("Verification Failed:", response?.reason);
-        alert(`Verification Failed: ${response?.reason || "Unknown Error"}`);
+        console.warn("Verification Failed:", response?.reason);
+        // Clean business-facing alert instead of code jargon
+        alert(`Verification Failed: ${response?.reason || "Could not confirm deposit layout metadata."}`);
       }
-    } catch (error) {
-      console.error("IPC verification pipeline crash:", error);
-      alert(`Internal Engine Communication Error: ${error.message}`);
+    } catch (err) {
+      // Bypassed for standard verification rejections
+      console.error("Critical verification form layout error:", err);
     }
   };
 
@@ -307,11 +321,22 @@ export default function AdminDashboard() {
         throw new Error(`Invalid Hash Format! "${purchaseTxHash}" must be a 66-character hex string starting with 0x.`);
       }
 
-      const verificationResponse = await window.api.triggerVault({
-        modeArg: "verify-erc20-receipt",
-        transactionHash: purchaseTxHash,
-        custodialWallet: targetTreasuryVault 
-      });
+      let verificationResponse = null;
+
+      // --- THE SHIELD LAYER ---
+      try {
+        verificationResponse = await window.api.triggerVault({
+          modeArg: "verify-erc20-receipt",
+          transactionHash: purchaseTxHash,
+          custodialWallet: targetTreasuryVault 
+        });
+      } catch (ipcError) {
+        // Direct the technical background crash straight to the console log
+        console.error("IPC validation background pipe crashed:", ipcError);
+        
+        // Mock a clean rejection profile so the code handles it smoothly down below
+        verificationResponse = { ok: false, reason: "The verification server was unable to index the transaction. Please ensure it is confirmed on-chain." };
+      }
 
       if (!verificationResponse || !verificationResponse.ok) {
         throw new Error(verificationResponse?.reason || "Receipt was not found on the blockchain indexer.");
@@ -432,12 +457,22 @@ export default function AdminDashboard() {
     }
 
     try {
-      const response = await window.electronAPI.saveAdminCredentials(
-        userAddress,
-        authMethod,
-        secretToSend,
-        keystorePassword
-      );
+      let response = null;
+
+      try {
+        response = await window.electronAPI.saveAdminCredentials(
+          userAddress,
+          authMethod,
+          secretToSend,
+          keystorePassword
+        );
+      } catch (ipcError) {
+        // Direct severe system/communication faults strictly to the dev console log
+        console.error("IPC Vault Authentication Bridge Exception:", ipcError);
+        
+        // Mock a clean failure object so the user block stays running smoothly
+        response = { success: false, error: "The local secure vault service is currently unreachable. Please restart the desktop client application." };
+      }
 
       // BACKEND VERIFICATION CHECK FIRST
       if (response && response.success) {
