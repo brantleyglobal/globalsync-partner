@@ -5,6 +5,7 @@ export interface CoreDeployments {
   GlobalLedger: string;
   GlobalSwap: string;
   GlobalSwapFactory: string;
+  GlobalSwapRegistry: string;
   AssetPurchase: string;
   AcquisitionGateway: string;
   SmartVault: string;
@@ -30,6 +31,7 @@ export const deployments: DeploymentAddresses = {
   "GlobalLedger": "0x87304937ecD2992e721F91EB28c2782CfDe9651f",
   "GlobalSwap": "0x158EDe80Bd6223D3067bF8c92eBB8bCDE8787389",
   "GlobalSwapFactory": "0xae1DB2aBCab95A71b62fCdc3E1137ADE197ef267",
+  "GlobalSwapRegistry": "0x0f92E61148052D9174B2E39FE68D2E9eB6383681",
   "AssetPurchase": "0x6aaD04b26Be4cAE6ac7A8a30452818570d95D69F",
   "AcquisitionGateway": "0x9371c7B4D8B7280f727A383290B86eA934878cd4",
   "SmartVault": "0xC09137815007e3E0469C235b7c2ded7753e5a008",

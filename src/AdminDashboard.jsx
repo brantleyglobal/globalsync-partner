@@ -13,6 +13,7 @@ import CoreAdminEngine from './components/coreAdminEngine';
 import CorePortfolioMatrix from './components/corePortfolio';
 import PartnerPortal from './components/corePartner.jsx';
 import AffiliatePortal from "./components/coreAffiliate.jsx";
+import GlobalSwapPortal from "./components/coreSwap.jsx";
 import Sidebar from './components/sideBar';
 import { styles } from './utils/styles.jsx';
 import './global.css';
@@ -581,8 +582,17 @@ export default function AdminDashboard() {
           isConnected={isConnected}
         />
       )}
+
+      {/* VIEW 3: SWAP PORTAL PANEL */}
+      {portalView === 'swap' && (
+        <GlobalSwapPortal
+          userAddress={userAddress}
+          activeContract={selectedContract}
+          isConnected={isConnected}
+        />
+      )}
       
-      {/* VIEW 2: CORE ADMIN ENGINE PANEL */}
+      {/* VIEW 5: CORE ADMIN ENGINE PANEL */}
       {portalView === 'admin' && (
         <CoreAdminEngine
           styles={styles}

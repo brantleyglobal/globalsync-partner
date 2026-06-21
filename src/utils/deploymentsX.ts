@@ -5,6 +5,7 @@ export interface CoreDeployments {
   GlobalLedger: string;
   GlobalSwap: string;
   GlobalSwapFactory: string;
+  GlobalSwapRegistry: string;
   AssetPurchase: string;
   AcquisitionGateway: string;
   SmartVault: string;
@@ -312,5 +313,6 @@ export const deployments: DeploymentAddresses = {
   "TGMxRenewable": "0x9bDAF95210d10b8523Eb28a9c2c9E54248650B45",
   "BGSellRE": "0xCEA91af044f3D37CF35027EA342E8205d5bbfbE6",
   "BGHoldRE": "0x0359C9Ab4940Aa3533c63622B82ec616FFabAde3",
-  "BGGrid": "0x190B69a8A36948EE0d0Ab44fCE4f2d426E59c261"
+  "BGGrid": "0x190B69a8A36948EE0d0Ab44fCE4f2d426E59c261",
+  "GlobalSwapRegistry": "0x0f92E61148052D9174B2E39FE68D2E9eB6383681"
 };

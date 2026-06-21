@@ -384,6 +384,143 @@ ipcMain.handle('blockchain:get-balances', async (event, userAddress) => {
   }
 });
 
+ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
+
+  const REGISTRY_ABI = [
+    "function swapRegistry(address) external view returns (address swapAddress, address partyA, address partyB, address tokenA, address tokenB, uint256 amountA, uint256 amountB, uint8 status)",
+    "function getSwapsForUser(address user) external view returns (address[] memory)",
+    "function createNewSwap(address partyA, address partyB, address tokenA, uint256 amountA, bytes32 partyADepositHash, address tokenB, uint256 amountB, bytes32 partyBDepositHash) external returns (address)",
+    "function deposit(address swapAddress, address party, bytes32 depositHash) external",
+    "function refund(address swapAddress, address party, bytes32 refundHash) external",
+    "function markPartyAPayoutCompleted(address swapAddress) external",
+    "function markPartyBPayoutCompleted(address swapAddress) external"
+  ];
+
+  const CLONE_INSTANCE_ABI = [
+    "function partyADeposited() external view returns (bool)",
+    "function partyBDeposited() external view returns (bool)",
+    "function payoutACompleted() external view returns (bool)",
+    "function payoutBCompleted() external view returns (bool)"
+  ];
+
+  const REGISTRY_STATUS_LABELS = {
+    0: "PendingDeposits", 1: "PartyADeposited", 2: "PartyBDeposited", 3: "Completed",
+    4: "PartyAPayoutDone", 5: "PartyBPayoutDone", 6: "FullySettled",
+    7: "PartyARefunded", 8: "PartyBRefunded", 9: "FullyRefunded"
+  };
+
+  try {
+    const { action, contractAddress, userAddress } = payload;
+
+    // --- SUB-ROUTINE 1: FETCH HISTORY ---
+    if (action === "GET_HISTORY") {
+      const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, providers.globalChain);
+      const cloneAddresses = await registryContract.getSwapsForUser(userAddress);
+      const historyRecords = [];
+
+      for (let i = 0; i < cloneAddresses.length; i++) {
+        const swapAddr = cloneAddresses[i];
+        const structDetails = await registryContract.swapRegistry(swapAddr);
+        
+        // Inspect individual lifecycle flags inside the unique instance clone
+        const instanceContract = new ethers.Contract(swapAddr, CLONE_INSTANCE_ABI, providers.globalChain);
+        let partyAClosed = false;
+        let partyBClosed = false;
+
+        try {
+          const [pA_Done, pB_Done, pA_Dep, pB_Dep] = await Promise.all([
+            instanceContract.payoutACompleted(),
+            instanceContract.payoutBCompleted(),
+            instanceContract.partyADeposited(),
+            instanceContract.partyBDeposited()
+          ]);
+          partyAClosed = pA_Done || pA_Dep;
+          partyBClosed = pB_Done || pB_Dep;
+        } catch (err) {
+          // Fallback if the clone instance is uninitialized or empty
+        }
+
+        const tokenAMatch = supportedTokens.find(t => t.address.toLowerCase() === structDetails.tokenA.toLowerCase());
+        const tokenBMatch = supportedTokens.find(t => t.address.toLowerCase() === structDetails.tokenB.toLowerCase());
+
+        // Push the cleaned record directly to the frontend array
+        historyRecords.push({
+          id: `${swapAddr}-${i}`,
+          cloneAddress: swapAddr,
+          partyA: structDetails.partyA,
+          partyB: structDetails.partyB,
+          tokenA: structDetails.tokenA,
+          tokenB: structDetails.tokenB,
+          amountA: structDetails.amountA.toString(), 
+          amountB: structDetails.amountB.toString(),
+          status: Number(structDetails.status),
+          statusLabel: REGISTRY_STATUS_LABELS[Number(structDetails.status)] || "Unknown",
+          partyAClosed,
+          partyBClosed,
+          
+          // If found in your array, use its true symbol. Otherwise, fall back gracefully.
+          symbolA: tokenAMatch ? tokenAMatch.symbol : "UNKNOWN",
+          symbolB: tokenBMatch ? tokenBMatch.symbol : "UNKNOWN"
+        });
+      }
+      return { success: true, data: historyRecords };
+    }
+
+    // --- PROTECTED ADMIN ROUTINES ---
+    // Enforce active wallet validation matching your system's design
+    if (!activeAdminSession || !activeAdminSession.isConnected) {
+      return { success: false, error: "Session missing. Please re-authenticate your admin wallet credentials." };
+    }
+    const adminSigner = new ethers.Wallet(activeAdminSession.secret, providers.globalChain);
+    const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, adminSigner);
+
+    // --- SUB-ROUTINE 2: DEPLOY NEW ESCROW ---
+    if (action === "CREATE_SWAP") {
+      const tx = await registryContract.createNewSwap(
+        payload.partyA,
+        payload.partyB,
+        payload.tokenA,
+        payload.amountA, 
+        payload.partyADepositHash,
+        payload.tokenB,
+        payload.amountB,
+        payload.partyBDepositHash
+      );
+      const receipt = await tx.wait(1);
+      return { success: true, txHash: receipt.hash };
+    }
+
+    // --- SUB-ROUTINE 3: DEPOSIT STEP ---
+    if (action === "DEPOSIT") {
+      const tx = await registryContract.deposit(payload.targetSwapAddress, userAddress, payload.clearingHash);
+      const receipt = await tx.wait(1);
+      return { success: true, txHash: receipt.hash };
+    }
+
+    // --- SUB-ROUTINE 4: REFUND STEP ---
+    if (action === "REFUND") {
+      const tx = await registryContract.refund(payload.targetSwapAddress, userAddress, payload.clearingHash);
+      const receipt = await tx.wait(1);
+      return { success: true, txHash: receipt.hash };
+    }
+
+    // --- SUB-ROUTINE 5: COMPLETE OUTRIGHT PAYOUTS ---
+    if (action === "EXECUTE_PAYOUT") {
+      const txA = await registryContract.markPartyAPayoutCompleted(payload.targetSwapAddress);
+      await txA.wait(1);
+      const txB = await registryContract.markPartyBPayoutCompleted(payload.targetSwapAddress);
+      const receiptB = await txB.wait(1);
+      return { success: true, txHash: receiptB.hash };
+    }
+
+    return { success: false, error: `Action variants matching request [${action}] unmapped.` };
+
+  } catch (error) {
+    console.error("Custom swap registry handler threw execution exception:", error);
+    return { success: false, error: error.reason || error.message };
+  }
+});
+
 // Inside main.js
 ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, contractAddress, chainKey }) => {
   if (!userAddress || !contractAddress) return [];

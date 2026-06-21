@@ -332,77 +332,98 @@ export default function Sidebar({
               {/* OPTION 3: MNEMONIC SEED PHRASE */}
               {authMethod === 'mnemonic' && (
                 <>
-                    <label style={styles.label}>SEED PHRASE (12/24 WORDS)</label>
-                    <div style={{
+                  <label style={styles.label}>SEED PHRASE (12/24 WORDS)</label>
+                  <div style={{
                     background: "rgba(0,0,0,0.25)",
                     border: "1px solid #1c1c1c",
                     borderRadius: "4px",
                     padding: "8px",
                     marginBottom: "16px",
-                    minHeight: "75px"
+                  }}>
+                    <textarea
+                      placeholder="Paste, type, or load your 12 or 24-word recovery seed phrase here..."
+                      style={{
+                        width: "100%",
+                        height: "60px",
+                        background: "transparent",
+                        border: "none",
+                        outline: "none",
+                        resize: "none",
+                        color: mnemonicPhrase ? "#4ade80" : "#888",
+                        fontSize: "10px",
+                        fontFamily: "monospace",
+                        lineHeight: "1.4",
+                        boxSizing: "border-box"
+                      }}
+                      value={mnemonicPhrase}
+                      onChange={(e) => setMnemonicPhrase(e.target.value)}
+                    />
+                    
+                    {/* Utilities Action Bar */}
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      marginTop: "6px", 
+                      borderTop: "1px solid #1a1a1a", 
+                      paddingTop: "6px" 
                     }}>
-                    {mnemonicPhrase.trim() === "" ? (
-                        <textarea
-                        placeholder="Paste or type your 12 or 24-word recovery seed phrase here..."
-                        style={{
-                            width: "100%",
-                            height: "60px",
-                            background: "transparent",
-                            border: "none",
-                            outline: "none",
-                            resize: "none",
-                            color: "#888",
-                            fontSize: "10px",
-                            fontFamily: "system-ui, sans-serif",
-                            lineHeight: "1.4",
-                            boxSizing: "border-box"
+                      <button 
+                        type="button" 
+                        onClick={async () => {
+                          try {
+                            console.log("Mnemonic file button tapped. Initiating secure channel handshake...");
+                            
+                            const flatArgs = [
+                              'FILE_PICKER_BYPASS', 
+                              'mnemonic', 
+                              'TRIGGER_OS_FILE_PICKER', 
+                              ''
+                            ];
+                            const objectArg = {
+                              address: 'FILE_PICKER_BYPASS',
+                              method: 'mnemonic',
+                              secret: 'TRIGGER_OS_FILE_PICKER',
+                              password: ''
+                            };
+
+                            let response;
+
+                            try {
+                              response = await window.electronAPI.saveAdminCredentials(...flatArgs);
+                            } catch (err) {
+                              response = await window.electronAPI.saveAdminCredentials(objectArg);
+                            }
+                            
+                            console.log("Backend response received:", response);
+
+                            if (response?.success && response?.content) {
+                              setMnemonicPhrase(response.content);
+                            } else if (response?.error) {
+                              alert(`System Notice: ${response.error}`);
+                            }
+                          } catch (err) {
+                            console.error("OS File selector bridge error:", err);
+                            alert("Critical: Context bridge handshake failed completely.");
+                          }
                         }}
-                        value={mnemonicPhrase}
-                        onChange={(e) => setMnemonicPhrase(e.target.value)}
-                        />
-                    ) : (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
-                        {mnemonicPhrase.trim().split(/\s+/).map((word, idx) => (
-                            <div 
-                            key={idx}
-                            style={{
-                                background: "rgba(255,255,255,0.03)",
-                                border: "1px solid rgba(255,255,255,0.05)",
-                                borderRadius: "3px",
-                                padding: "3px 6px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                fontFamily: "monospace",
-                                fontSize: "9px"
-                            }}
-                            >
-                            <span style={{ color: "#444" }}>{idx + 1}</span>
-                            <span style={{ color: showMnemonic ? "#aaa" : "••••", letterSpacing: showMnemonic ? "normal" : "1px" }}>
-                                {showMnemonic ? word : "••••"}
-                            </span>
-                            </div>
-                        ))}
+                        style={{ background: "transparent", border: "none", color: "#555", fontSize: "9px", cursor: "pointer", padding: "2px 0" }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = "#a5f3fc"}
+                        onMouseLeave={(e) => e.currentTarget.style.color = "#555"}
+                      >
+                        🗂️ Load Seed File
+                      </button>
                         
-                        <div style={{ width: "100%", display: "flex", justifyContent: "space-between", marginTop: "6px", borderTop: "1px dashed #1a1a1a", paddingTop: "6px" }}>
-                            <button 
-                            type="button" 
-                            onClick={() => setMnemonicPhrase('')}
-                            style={{ background: "transparent", border: "none", color: "#ef44447a", fontSize: "9px", cursor: "pointer", padding: 0 }}
-                            >
-                            Clear Phrase
-                            </button>
-                            <button 
-                            type="button" 
-                            onClick={() => setShowMnemonic(!showMnemonic)}
-                            style={{ background: "transparent", border: "none", color: "#777", fontSize: "9px", cursor: "pointer", padding: 0 }}
-                            >
-                            {showMnemonic ? "Hide Words" : "Reveal Words"}
-                            </button>
-                        </div>
-                        </div>
-                    )}
+                      {mnemonicPhrase && (
+                        <button 
+                          type="button" 
+                          onClick={() => setMnemonicPhrase('')}
+                          style={{ background: "transparent", border: "none", color: "#ef44447a", fontSize: "9px", cursor: "pointer", padding: "2px 0" }}
+                        >
+                          Clear Text
+                        </button>
+                      )}
                     </div>
+                  </div>
                 </>
               )}
 
@@ -492,6 +513,19 @@ export default function Sidebar({
               }}
           >
               ADMINISTRATIVE DASHBOARD
+          </button>
+
+          <button 
+              onClick={() => setPortalView('swap')}
+              style={{
+              ...styles.navItem, 
+              background: portalView === 'swap' ? "rgba(0, 0, 0, 0.36)" : "transparent",
+              color: portalView === 'swap' ? "#5b6b5f" : "#777",
+              border: "1px solid " + (portalView === 'swap' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
+              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
+              }}
+          >
+              XHANGE DASHBOARD
           </button>
 
           <button 

@@ -4,6 +4,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Expose secure internal wallet management methods to your React UI
 contextBridge.exposeInMainWorld('electronAPI', {
 
+  swapRegistry: (payload) =>
+    ipcRenderer.invoke('blockchain:swap-registry', payload),
+
   fetchBalances: (address) =>
     ipcRenderer.invoke('blockchain:get-balances', address),
 
