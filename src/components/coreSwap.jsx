@@ -1,7 +1,7 @@
 // src/components/coreSwap.jsx
 import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
-import { deployments, supportedTokens } from '../utils/tokensX';
+import { deployments, supportedTokens, dividendTokens } from '../utils/tokensX';
 
 function formatMoneyFromDigits(raw) {
   // Remove all non‑digits (Type annotation safely removed)
@@ -55,6 +55,15 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
 
   const [isEscrowModalOpen, setIsEscrowModalOpen] = useState(false);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+
+  const mergedTokens = [
+      ...supportedTokens,
+      ...dividendTokens.filter(
+          dividend => !supportedTokens.some(
+          supported => supported.symbol === dividend.symbol
+          )
+      ),
+  ];
 
   const modalStyles = {
     overlay: {
@@ -342,7 +351,7 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
                     onChange={(e) => setTokenA(e.target.value)}
                 >
                     <option value="" disabled style={{ background: "#121212" }}>Select Asset A</option>
-                    {supportedTokens.map((token) => (
+                    {mergedTokens.map((token) => (
                     <option key={`tokenA-${token.address}`} value={token.address} style={{ background: "#121212" }}>
                         {token.symbol} ({token.name || token.chain})
                     </option>
@@ -386,7 +395,7 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
                     onChange={(e) => setTokenB(e.target.value)}
                 >
                     <option value="" disabled style={{ background: "#121212" }}>Select Asset B</option>
-                    {supportedTokens.map((token) => (
+                    {mergedTokens.map((token) => (
                     <option key={`tokenB-${token.address}`} value={token.address} style={{ background: "#121212" }}>
                         {token.symbol} ({token.name || token.chain})
                     </option>

@@ -14,6 +14,7 @@ import CorePortfolioMatrix from './components/corePortfolio';
 import PartnerPortal from './components/corePartner.jsx';
 import AffiliatePortal from "./components/coreAffiliate.jsx";
 import GlobalSwapPortal from "./components/coreSwap.jsx";
+import NativeExchangeHistory from "./components/coreNative.jsx";
 import Sidebar from './components/sideBar';
 import { styles } from './utils/styles.jsx';
 import './global.css';
@@ -47,6 +48,11 @@ export default function AdminDashboard() {
   const [mnemonicPhrase, setMnemonicPhrase] = useState("");
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+
+  const [pledgedToken, setPledgedToken] = useState("");
+  const [pledgedAmount, setPledgedAmount] = useState("");
+  const [exchangeRate, setExchangeRate] = useState("");
+  const [convertedAmount, setConvertedAmount] = useState("");
 
   const [selectedStableTokenSymbol, setSelectedStableTokenSymbol] = useState(""); // e.g., "LGE20KVA"
   const [selectedAssetKey, setSelectedAssetKey] = useState(""); // e.g., "LGE20KVA"
@@ -122,6 +128,23 @@ export default function AdminDashboard() {
       setTimestampResults([response]);
     } else {
       setTimestampResults([{ error: "Failed to fetch data from backend" }]);
+    }1
+  };
+
+  const handlePurchaseNative = async (amount, tokenSymbolOrAddress, rate) => {
+    try {
+      console.log(`Processing backend transaction for ${amount} ${tokenSymbolOrAddress} at rate ${rate}`);
+      
+      // 1. Call your web3 provider / electron IPC pipeline / smart contract here
+      // const tx = await myContract.buyGBDo(amount, ...);
+      // await tx.wait();
+
+      // 2. Return a safe success flag so the Sidebar knows it can clear inputs and close drawers
+      return { success: true };
+      
+    } catch (error) {
+      console.error("Parent transaction routing failure:", error);
+      return { success: false, message: error.message };
     }
   };
 
@@ -548,6 +571,15 @@ export default function AdminDashboard() {
       setShowKeystorePass={setShowKeystorePass}
       showMnemonic={showMnemonic}
       setShowMnemonic={setShowMnemonic}
+      pledgedToken={pledgedToken}
+      setPledgedToken={setPledgedToken}
+      pledgedAmount={pledgedAmount}
+      setPledgedAmount={setPledgedAmount}
+      exchangeRate={exchangeRate}
+      setExchangeRate={setExchangeRate}
+      convertedAmount={convertedAmount}
+      setConvertedAmount={setConvertedAmount}
+      purchaseNative={handlePurchaseNative}
       isConnected={isConnected}
       onConnectWallet={handleSecureConnect}
       onDisconnectWallet={handleSecureDisconnect}
@@ -583,7 +615,7 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* VIEW 3: SWAP PORTAL PANEL */}
+      {/* VIEW 4: SWAP PORTAL PANEL */}
       {portalView === 'swap' && (
         <GlobalSwapPortal
           userAddress={userAddress}
@@ -591,8 +623,17 @@ export default function AdminDashboard() {
           isConnected={isConnected}
         />
       )}
+
+      {/* VIEW 5: GATEWAY PORTAL PANEL */}
+      {portalView === 'gateway' && (
+        <NativeExchangeHistory
+          userAddress={userAddress}
+          activeContract={selectedContract}
+          isConnected={isConnected}
+        />
+      )}
       
-      {/* VIEW 5: CORE ADMIN ENGINE PANEL */}
+      {/* VIEW 6: CORE ADMIN ENGINE PANEL */}
       {portalView === 'admin' && (
         <CoreAdminEngine
           styles={styles}

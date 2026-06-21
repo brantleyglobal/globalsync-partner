@@ -7,6 +7,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   swapRegistry: (payload) =>
     ipcRenderer.invoke('blockchain:swap-registry', payload),
 
+  submitAcquisition: (payload) => 
+    ipcRenderer.invoke('submit-acquisition', payload),
+
+  submitUserLiquidate: (payload) => 
+    ipcRenderer.invoke('submit-user-liquidate', payload),
+
+  getNativeExchangeHistory: (payload) => 
+    ipcRenderer.invoke('get-native-exchange-history', payload),
+
   fetchBalances: (address) =>
     ipcRenderer.invoke('blockchain:get-balances', address),
 

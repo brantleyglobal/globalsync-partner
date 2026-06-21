@@ -2,6 +2,47 @@
 import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
 import logo from '../assets/logo.png';
+import { supportedTokens } from '../utils/tokensX';
+import { getExchangeRates } from "../utils/exchangeRates";
+
+function formatMoneyFromDigits(raw) {
+  // Remove all non‑digits (Type annotation safely removed)
+  const digits = raw.replace(/\D/g, "");
+
+  if (digits === "") return "";
+
+  // Convert to number of cents
+  const cents = Number(digits);
+
+  // Convert to dollars with 2 decimals
+  const value = (cents / 100).toFixed(2);
+
+  // Add commas
+  return Number(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function parseLocalNumber(rawNumber, locale = undefined) {
+  if (!rawNumber) return 0;
+  
+  // Convert to string safely in case a primitive number slips in
+  const targetString = String(rawNumber);
+
+  // Detect the decimal character used by the current user locale (e.g., '.' or ',')
+  const amountToFormat = Intl.NumberFormat(locale).format(1.1);
+  const decimal = amountToFormat.charAt(amountToFormat.length - 2);
+
+  // Strip out everything except numbers, the negative sign, and the local decimal symbol
+  const normalized = targetString.replace(new RegExp(`[^0-9${decimal}-]`, "g"), "");
+
+  // If the local decimal separator is a comma, swap it to a period so standard Number() can process it
+  const standardFormat = decimal === ',' ? normalized.replace(',', '.') : normalized;
+
+  const result = Number(standardFormat);
+  return isNaN(result) ? 0 : result;
+}
 
 export default function Sidebar({ 
   portalView, 
@@ -25,13 +66,98 @@ export default function Sidebar({
   setShowKeystorePass,
   showMnemonic,
   setShowMnemonic,
+  pledgedToken,
+  setPledgedToken,
+  pledgedAmount,
+  setPledgedAmount,
+  exchangeRate,
+  setExchangeRate,
+  convertedAmount,
+  setConvertedAmount,
+  purchaseNative,
   isConnected,
   onConnectWallet,
   onDisconnectWallet
 }) {
   // Keep your local layout toggle states here
   const [showAuthDrawer, setShowAuthDrawer] = useState(false);
-  const [isOpen, setIsOpen] = useState(false); // operational compliance drawer
+  const [showPurchaseDrawer, setShowPurchaseDrawer] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const [transactionType, setTransactionType] = useState("deposit");
+
+  // Automatically resolves the hex contract address right before submitting 
+  const targetTokenObj = supportedTokens?.find(t => t.symbol === pledgedToken);
+  const tokenIdentifier = targetTokenObj?.address || pledgedToken;
+
+  const handleNativePurchase = async () => {
+    // 1. Guard check: Ensure wallet state context is bound
+    if (!userAddress) {
+      alert("Please connect or enter a valid wallet address.");
+      return;
+    }
+
+    // 2. Structural Guard: Reject empty requests before hitting the node pipeline
+    const amountFloat = parseFloat(pledgedAmount);
+    if (!pledgedAmount || isNaN(amountFloat) || amountFloat <= 0) {
+      alert("Please enter a valid deposit amount greater than zero.");
+      return;
+    }
+
+    if (!pledgedToken) {
+      alert("Please select a deposit method token.");
+      return;
+    }
+
+    try {
+      // Optional: Turn on busy states (e.g., setIsLoading(true))
+      console.log(`Initiating purchase for ${pledgedAmount} of token ${pledgedToken}...`);
+
+      // Calculate the expected GBDo output token metrics 
+      // formula: amountIn * exchangeRate (or your app's specific custom conversion logic)
+      const computedAmountOut = amountFloat * parseFloat(exchangeRate || 1);
+
+      // Generate a pseudo-random, unique tracking hash for the smart contract's replay guard
+      // We append the timestamp to a standard 32-byte hex template string
+      const uniqueNonce = Math.floor(Math.random() * 1000000);
+      const depositHash = `0x${Buffer.from(`DEP-${Date.now()}-${uniqueNonce}`).toString('hex').padEnd(64, '0')}`.slice(0, 66);
+
+      // Construct the exact payload payload format expected by main.js
+      const payload = {
+        userAddress: userAddress,
+        tokenAddress: pledgedToken, // Assuming pledgedToken state holds the token contract address
+        amountIn: pledgedAmount,
+        amountOut: computedAmountOut.toString(),
+        exchangeRate: exchangeRate.toString(),
+        depositHash: depositHash
+      };
+
+      // Invoke your secure preload contextBridge window method
+      const result = await window.electronAPI.submitAcquisition(payload);
+      
+      // 7. Evaluate explicitly using a safe boolean evaluation
+      if (result && result.success) {
+        console.log(`Purchase transaction completed successfully. Tx Hash: ${result.txHash}`);
+        alert(`Transaction confirmed! Hash: ${result.txHash}`);
+        
+        // Clear inputs to prevent stale double-submissions
+        if (typeof setPledgedAmount === "function") setPledgedAmount("");
+        
+        // Close out the toggle parameters to minimize cleartext remnants
+        if (typeof setShowPurchaseDrawer === "function") setShowPurchaseDrawer(false); 
+        if (typeof setIsOpen === "function") setIsOpen(false);
+      } else {
+        // Handle cases where the promise resolved but the backend script failed
+        throw new Error(result?.error || "Transaction execution failed or reverted on-chain.");
+      }
+
+    } catch (error) {
+      console.error("Critical Failure inside handleNativePurchase:", error);
+      alert(`Purchase Failed: ${error.message || "Unknown execution or network error"}`);
+    } finally {
+      // Optional: Turn off transaction busy states here (e.g., setIsLoading(false))
+    }
+  };
 
   const handleSaveCredentials = async () => {
     // Guard check: Ensure they filled in the public target address
@@ -64,6 +190,97 @@ export default function Sidebar({
       setIsOpen(false);
     }
   };
+
+  useEffect(() => {
+      let cancelled = false; // guard against stale responses
+      const requestId = Date.now();
+  
+      const fetchRate = async () => {
+        const symbol = String(pledgedToken || "").toUpperCase();
+        if (!symbol) return;
+  
+        try {
+          const { rates, gbdoRate } = await getExchangeRates();
+  
+          // Validate gbdoRate
+          const gbdo = Number(gbdoRate);
+          if (!isFinite(gbdo) || gbdo <= 0) {
+            throw new Error(`Invalid GBDO rate: ${gbdoRate}`);
+          }
+  
+          // Hardcoded USD prices for volatile tokens (example values)
+          const hardcodedUsd = {
+            WETH: 3000,
+            WBNB: 900,
+            WBTC: 90000,
+          };
+  
+          // Build a quick lookup for API rates (assumed USD)
+          const apiMap = new Map();
+          if (Array.isArray(rates)) {
+            for (const r of rates) {
+              if (r?.symbol) {
+                apiMap.set(String(r.symbol).toUpperCase(), Number(r.rate));
+              }
+            }
+          }
+  
+          // Resolve tokenRate (USD)
+          let tokenRate = hardcodedUsd[symbol];
+          if (tokenRate === undefined) {
+            const apiRate = apiMap.get(symbol);
+            if (!isFinite(apiRate)) {
+              throw new Error(`Exchange rate for token ${symbol} not found or invalid`);
+            }
+            tokenRate = apiRate;
+          }
+  
+          // Compute token → GBDo
+          const exchangeRateFloat = tokenRate / gbdo;
+  
+          // Extra validation
+          if (!isFinite(exchangeRateFloat)) {
+            throw new Error(
+              `Computed exchange rate is invalid: tokenRate=${tokenRate}, gbdoRate=${gbdo}`
+            );
+          }
+  
+          // Skip if effect has been cancelled (user changed token)
+          if (cancelled) return;
+  
+          // Keep string handler
+          setExchangeRate(exchangeRateFloat.toString());
+        } catch (err) {
+          console.error("Error fetching exchange rate:", err);
+          setExchangeRate("");
+        }
+      };
+  
+      fetchRate();
+  
+      return () => {
+        // cancel any in-flight response from older selections
+        cancelled = true;
+      };
+    }, [pledgedToken]);
+  
+    // Derive converted amount whenever depositAmount or exchangeRate changes
+    useEffect(() => {
+      if (!exchangeRate || pledgedAmount === "") {
+        setConvertedAmount("");
+        return;
+      }
+  
+      const rate = formatMoneyFromDigits(exchangeRate);
+      const locale = navigator.language || "en-US";
+      const amount = (parseLocalNumber(pledgedAmount, locale) * parseLocalNumber(exchangeRate, locale));
+      const converted = formatMoneyFromDigits((amount).toFixed(2)).toString();
+  
+      setConvertedAmount(
+        converted
+      );
+      
+    }, [pledgedAmount, exchangeRate]);
 
   useEffect(() => {
     // Create a style element dynamically
@@ -136,13 +353,11 @@ export default function Sidebar({
               </span>
           </div>
         </div>
-        
-        {/*<hr style={styles.divider} />*/}
-        
+                
         {/* 1. SIGN-IN / CREDENTIALS DRAWER */}
         <div style={{ display: "flex", flexDirection: "column", fontFamily: "system-ui, sans-serif", margin: "0 12px 16px 12px" }}>
           <div 
-              onClick={() => setShowAuthDrawer(!showAuthDrawer)} 
+              onClick={() => (setShowAuthDrawer(!showAuthDrawer), setShowPurchaseDrawer(false))} 
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -474,7 +689,225 @@ export default function Sidebar({
           )}
         </div>
 
-        {/*<hr style={styles.divider} />*/}
+        {/* PURCHASE GBDo / NATIVE DRAWER */}
+        <div style={{ display: "flex", flexDirection: "column", fontFamily: "system-ui, sans-serif", margin: "0 12px 16px 12px" }}>
+          <div 
+              onClick={() => (setShowPurchaseDrawer(!showPurchaseDrawer), setShowAuthDrawer(false))} 
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 4px",
+                cursor: "pointer",
+                borderTop: "1px solid #1a1a1a",
+                borderBottom: showPurchaseDrawer ? "none" : "1px solid #1a1a1a",
+                transition: "color 0.2s ease",
+                color: showPurchaseDrawer ? "#4ade807a" : "#555" 
+              }}
+          >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", letterSpacing: "1px", fontWeight: "600" }}>
+              <span style={{ 
+                  width: "6px", 
+                  height: "6px", 
+                  borderRadius: "50%", 
+                  background: showPurchaseDrawer ? "#4ade80" : "#333",
+                  boxShadow: showPurchaseDrawer ? "0 0 8px #4ade80" : "none"
+              }} />
+              GBDo GATEWAY
+              </div>
+              <span style={{ fontSize: "9px", transform: showPurchaseDrawer ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", opacity: 0.5 }}>
+              ▼
+              </span>
+          </div>
+
+          {showPurchaseDrawer && (
+              <div style={{ ...styles.configSection, marginTop: "12px", borderTop: "1px dashed #222", paddingTop: "12px" }}>
+              {!isConnected && (
+                <p style={styles.microText}>Wallet connection required to proceed.</p>
+              )}
+              
+
+              {/* NATIVE PURCHASE & LIQUIDATION MODAL LAYER */}
+              {!isConnected && (
+                <>
+                  <label style={styles.label}>ONBOARDING</label>
+                  
+                  {/* DIRECTION TOGGLE SYSTEM */}
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                    <button
+                      type="button"
+                      style={{
+                        flex: 1,
+                        padding: "8px",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        borderRadius: "4px",
+                        border: "1px solid #222",
+                        cursor: "pointer",
+                        background: transactionType === "deposit" ? "#1a1a1a" : "transparent",
+                        color: transactionType === "deposit" ? "#4ade80" : "#666",
+                      }}
+                      onClick={() => {
+                        setTransactionType("deposit");
+                        setPledgedAmount(""); // Reset inputs on switch to keep states clean
+                      }}
+                    >
+                      DEPOSIT NATIVE
+                    </button>
+                    <button
+                      type="button"
+                      style={{
+                        flex: 1,
+                        padding: "8px",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        borderRadius: "4px",
+                        border: "1px solid #222",
+                        cursor: "pointer",
+                        background: transactionType === "cashout" ? "#1a1a1a" : "transparent",
+                        color: transactionType === "cashout" ? "#f87171" : "#666",
+                      }}
+                      onClick={() => {
+                        setTransactionType("cashout");
+                        setPledgedAmount("");
+                      }}
+                    >
+                      CASH OUT NATIVE
+                    </button>
+                  </div>
+
+                  <div>
+                    <div>
+                      {/* DYNAMIC LABELS */}
+                      <label style={styles.label}>
+                        {transactionType === "deposit" ? "DEPOSIT METHOD" : "CASH OUT METHOD"}
+                      </label>
+                      
+                      <select 
+                        style={styles.inputElement} 
+                        value={pledgedToken}
+                        onChange={(e) => setPledgedToken(e.target.value)}
+                      >
+                        <option value="" disabled style={{ background: "#121212" }}>
+                          Select {transactionType === "deposit" ? "Deposit" : "Withdrawal"} Asset
+                        </option>
+                        {Array.isArray(supportedTokens) && supportedTokens
+                          .filter((token) => !["BTC", "LINK", "ETH", "UNI", "MATIC", "COPx", "GBDo"].includes(token.symbol))
+                          .map((token) => (
+                          <option key={`tokenB-${token.address}`} value={token.symbol} style={{ background: "#121212" }}>
+                            {token.symbol} ({token.name || token.chain})
+                          </option>
+                        ))}
+                      </select>
+
+                      <label style={styles.label}>
+                        {transactionType === "deposit" ? "DEPOSIT AMOUNT" : "CASH OUT AMOUNT"}
+                      </label>
+                      
+                      <div style={{...styles.cryptoInputWrapper, marginBottom: '16px'}}>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9]*"
+                          placeholder={transactionType === "deposit" ? "Enter Amount Requested" : "Enter Amount to Cash Out"}
+                          style={{...styles.sidebarInput, marginBottom: 0, paddingRight: '45px'}}
+                          value={pledgedAmount}
+                          onChange={(e) => {
+                            const formatted = formatMoneyFromDigits(e.target.value);
+                            setPledgedAmount(formatted);
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+
+                        {/* TRANSPARENT LIVE CALCULATION DISK */}
+                        <div style={{ 
+                          display: "flex", 
+                          justifyContent: "space-between", 
+                          alignItems: "center",
+                          padding: "10px 4px", 
+                          borderTop: "1px dashed #1a1a1a",
+                          marginTop: "4px"
+                        }}>
+                          <span style={{ fontSize: "10px", color: "#555", fontWeight: "600", letterSpacing: "0.5px" }}>
+                            {transactionType === "deposit" ? "ESTIMATED GBDo" : `ESTIMATED ${pledgedToken || "NATIVE"}`}
+                          </span>
+                          <span style={{ 
+                            fontSize: "13px", 
+                            color: pledgedAmount && exchangeRate ? "#4ade80" : "#444", 
+                            fontWeight: "400", 
+                            fontFamily: "monospace" 
+                          }}>
+                            {(() => {
+                              const amount = parseFloat(String(pledgedAmount).replace(/,/g, ''));
+                              const rate = parseFloat(exchangeRate);
+                              
+                              if (!isNaN(amount) && !isNaN(rate) && amount > 0 && rate > 0) {
+                                if (transactionType === "deposit") {
+                                  // Deposit: Token Amount * Rate = GBDo Received
+                                  const totalGbdo = amount * rate;
+                                  return `${totalGbdo.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} GBDo`;
+                                } else {
+                                  // Cash Out: GBDo Amount / Rate = Native Token Returned
+                                  const totalNative = amount / rate;
+                                  return `${totalNative.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ${pledgedToken}`;
+                                }
+                              }
+                              
+                              return transactionType === "deposit" ? "0.00 GBDo" : `0.0000 ${pledgedToken || "Token"}`;
+                            })()}
+                          </span>
+                        </div>
+
+                        {/* EXCHANGE RATE SUBTEXT */}
+                        {exchangeRate && pledgedToken && (
+                          <div style={{ fontSize: "10px", color: "#666", margin: "2px 0 8px 4px", display: "flex", justifyContent: "space-between" }}>
+                            <span>CONVERSION RATE:</span>
+                            <span style={{ fontFamily: "monospace", color: "#aaa" }}>
+                              1 {pledgedToken} ≈ {isFinite(parseFloat(exchangeRate)) ? parseFloat(exchangeRate).toFixed(4) : "0.00"} GBDo
+                            </span>
+                          </div>
+                        )}
+                        
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {isConnected && (
+                  <button 
+                  type="button"
+                  onClick={handleDisconnectWallet}
+                  style={{
+                      width: "100%",
+                      padding: "8px",
+                      background: "#0a0a0ab6",
+                      border: "1px solid rgba(0, 0, 0, 0.76)",
+                      borderRadius: "4px",
+                      color: "#444444",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      letterSpacing: "0.5px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(10, 10, 10, 0.83)";
+                      e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.76)";
+                  }}
+                  onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(10, 10, 10, 0.83)";
+                      e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.76)";
+                  }}
+                  >
+                  SUBMIT PURCHASE
+                  </button>
+              )}
+              </div>
+          )}
+        </div>
 
         {/* PORTAL VIEW SELECTION SYSTEM */}
         <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "0 12px 16px 12px", marginTop: "30px", fontFamily: "system-ui, sans-serif" }}>
@@ -513,6 +946,19 @@ export default function Sidebar({
               }}
           >
               ADMINISTRATIVE DASHBOARD
+          </button>
+
+          <button 
+              onClick={() => setPortalView('gateway')}
+              style={{
+              ...styles.navItem, 
+              background: portalView === 'gateway' ? "rgba(0, 0, 0, 0.36)" : "transparent",
+              color: portalView === 'gateway' ? "#5b6b5f" : "#777",
+              border: "1px solid " + (portalView === 'gateway' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
+              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
+              }}
+          >
+              GBDo GATEWAY
           </button>
 
           <button 

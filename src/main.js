@@ -32,7 +32,9 @@ const CONTRACT_ABI = [
   "function getUserDepositCount(address user) external view returns (uint256)",
   "function getWithdrawalUser(address user, uint256 index) external view returns (tuple(address user, uint256 index) memory)",
   "function getDepositUser(address user, uint256 index) external view returns (tuple(address user, uint256 index) memory)",
-  "function purchase(address buyer, address stable, uint256 productId, uint256 amount, uint256 shipping, uint256 customizations, bytes32 configs, uint256 quantity, uint256 rate, address affiliate, uint256 commission, uint256 region, bytes32 depositHash, uint256 purchaseTimeStamp) external"
+  "function purchase(address buyer, address stable, uint256 productId, uint256 amount, uint256 shipping, uint256 customizations, bytes32 configs, uint256 quantity, uint256 rate, address affiliate, uint256 commission, uint256 region, bytes32 depositHash, uint256 purchaseTimeStamp) external",
+  "function acquisition(address user, address token, uint256 amountin, uint256 amountout, uint256 rate, uint256 currentTxTime, bytes32 depositHash) external nonReentrant",
+  "function liquidate(address payoutToken, uint256 amount, uint256 timeStamp) external"
 ];
 
 const decimalsCache = {};
@@ -731,6 +733,198 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
   }
 });
 
+ipcMain.handle('submit-acquisition', async (event, payload) => {
+
+  const provider = providers.globalChain;
+
+  // 1. Check RAM memory instead of the hard drive file
+  if (!activeAdminSession || !activeAdminSession.isConnected) {
+    return { status: "Error", error: "No active admin wallet profile loaded in session memory." };
+  }
+
+  let signer;
+
+  try {
+    // 2. Read the secret directly out of your activeAdminSession RAM variable
+    if (activeAdminSession.method === 'privateKey') {
+      signer = new ethers.Wallet(activeAdminSession.secret, provider);
+
+    } else if (activeAdminSession.method === 'mnemonic') {
+      signer = ethers.Wallet.fromPhrase(activeAdminSession.secret, provider);
+
+    } else if (activeAdminSession.method === 'keystore') {
+      // If it's a keystore file, read the secret string and the password from RAM
+      let rawJson = activeAdminSession.secret;
+      const pass = activeAdminSession.password || "";
+      
+      signer = await ethers.Wallet.fromEncryptedJson(rawJson, pass);
+      signer = signer.connect(provider);
+
+    } else {
+      return { status: "Error", error: "Unsupported structural signing key type." };
+    }
+
+  } catch (err) {
+    console.error("Failed to build signer from memory session:", err);
+    return { status: "Error", error: `Signer hydration failed: ${err.message}` };
+  }
+
+  console.log(`Executing contract state modification using signer: ${signer.address}`);
+  const mainContract = new ethers.Contract(deployments.AcquisitionGateway, CONTRACT_ABI, signer);
+
+  try {
+    const { 
+      userAddress,    // Web3 address of target user
+      tokenAddress,   // Address of inbound deposit token (e.g., WETH, USDC)
+      amountIn,       // Raw stablecoin/deposit amount from user 
+      amountOut,      // Calculated GBDo value to mint/distribute
+      exchangeRate,   // Current system conversion rate metrics
+      depositHash     // Unique hash identifier for deduplication check
+    } = payload;
+
+    console.log(`[Electron Backend] Initiating acquisition rule for user ${userAddress}...`);
+
+    // Parse values securely into BigInt representation (assuming 18 decimal assets)
+    const parsedAmountIn = ethers.parseUnits(amountIn.toString(), 18);
+    const parsedAmountOut = ethers.parseUnits(amountOut.toString(), 18);
+    const parsedRate = ethers.parseUnits(exchangeRate.toString(), 18);
+    const currentTxTime = Math.floor(Date.now() / 1000);
+
+    // Call your exact contract function layout natively
+    const tx = await mainContract.acquisition(
+      userAddress,
+      tokenAddress,
+      parsedAmountIn,
+      parsedAmountOut,
+      parsedRate,
+      currentTxTime,
+      depositHash
+    );
+
+    console.log(`[Transaction Broadcasted] Hash: ${tx.hash}`);
+    const receipt = await tx.wait(); // Wait for block confirmation
+
+    return { success: true, txHash: receipt.hash };
+
+  } catch (error) {
+    console.error("[Electron Backend] Acquisition Transaction Failure:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('submit-user-liquidate', async (event, payload) => {
+
+  const provider = providers.globalChain;
+
+  // 1. Check RAM memory instead of the hard drive file
+  if (!activeAdminSession || !activeAdminSession.isConnected) {
+    return { status: "Error", error: "No active admin wallet profile loaded in session memory." };
+  }
+
+  let signer;
+
+  try {
+    // 2. Read the secret directly out of your activeAdminSession RAM variable
+    if (activeAdminSession.method === 'privateKey') {
+      signer = new ethers.Wallet(activeAdminSession.secret, provider);
+
+    } else if (activeAdminSession.method === 'mnemonic') {
+      signer = ethers.Wallet.fromPhrase(activeAdminSession.secret, provider);
+
+    } else if (activeAdminSession.method === 'keystore') {
+      // If it's a keystore file, read the secret string and the password from RAM
+      let rawJson = activeAdminSession.secret;
+      const pass = activeAdminSession.password || "";
+      
+      signer = await ethers.Wallet.fromEncryptedJson(rawJson, pass);
+      signer = signer.connect(provider);
+
+    } else {
+      return { status: "Error", error: "Unsupported structural signing key type." };
+    }
+
+  } catch (err) {
+    console.error("Failed to build signer from memory session:", err);
+    return { status: "Error", error: `Signer hydration failed: ${err.message}` };
+  }
+
+  console.log(`Executing contract state modification using signer: ${signer.address}`);
+  const mainContract = new ethers.Contract(deployments.AcquisitionGateway, contractABI, signer);
+
+  try {
+    const { payoutTokenAddress, amountToCashOut } = payload;
+    const timeStamp = Math.floor(Date.now() / 1000);
+
+    // Parse user numeric parameters securely
+    const parsedAmount = ethers.parseUnits(amountToCashOut.toString(), 18);
+
+    console.log(`[Electron Backend] Processing public liquidation queue for ${amountToCashOut} tokens...`);
+
+    // Sends the transaction directly to your liquidated code block structure
+    const tx = await mainContract.liquidate(
+      payoutTokenAddress,
+      parsedAmount,
+      timeStamp
+    );
+
+    const receipt = await tx.wait();
+    return { success: true, txHash: receipt.hash };
+
+  } catch (error) {
+    console.error("[Electron Backend] User Liquidation Submission Failure:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-native-exchange-history', async (event, { userAddress }) => {
+  try {
+    const provider = providers.globalChain;
+    // We instantiate a generic provider read-only instance to maximize speed and bypass wallet locks
+    const readContract = new ethers.Contract(deployments.AcquisitionGateway, CONTRACT_ABI, provider);
+
+    console.log(`[Electron Backend] Compiling exchange history for user: ${userAddress}`);
+
+    // 1. Fetch total transactions logged under the user profile
+    const totalTermsBigInt = await readContract.getUserTermCount(userAddress);
+    const totalTerms = Number(totalTermsBigInt);
+
+    const historyRecords = [];
+
+    // 2. Loop through tracking slots cleanly via open index view lookups
+    for (let i = 0; i < totalTerms; i++) {
+      const p = await readContract.getUserTerm(userAddress, i);
+
+      // Map raw blockchain struct arrays into clean native JS data objects
+      historyRecords.push({
+        timestamp: Number(p.timestamp),
+        user: p.user,
+        token: p.token,
+        payoutSetter: p.payoutSetter,
+        refundSetter: p.refundSetter,
+        termIndex: Number(p.termIndex),
+        amountin: p.amountin.toString(),        // Lowercase to match your struct exactly
+        amountout: p.amountout.toString(),      // Lowercase to match your struct exactly
+        exchangeRate: p.exchangeRate.toString(),
+        purchaseTxHash: p.purchaseTxHash,
+        payoutTxHash: p.payoutTxHash,
+        refundHash: p.refundHash,
+        refund: p.refund,
+        credit: p.credit
+      });
+    }
+
+    // Sort records sequentially (most recent transactions show first)
+    return { 
+      success: true, 
+      records: historyRecords.sort((a, b) => b.timestamp - a.timestamp) 
+    };
+
+  } catch (error) {
+    console.error("[Electron Backend] Failed to recompile user exchange records:", error);
+    return { success: false, error: error.message, records: [] };
+  }
+});
+
 ipcMain.handle('trigger-vault', async (event, payload) => {
   try {
 
@@ -905,35 +1099,37 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
     // ==========================================
     if (modeArg === "execute-state-change") {
       const provider = providers.globalChain;
-      
-      // Check if an encrypted file exists locally
-      if (!fs.existsSync(secureConfigPath)) {
-        return { status: "Error", error: "No admin wallet profile configured on this system." };
+
+      // 1. Check RAM memory instead of the hard drive file
+      if (!activeAdminSession || !activeAdminSession.isConnected) {
+        return { status: "Error", error: "No active admin wallet profile loaded in session memory." };
       }
 
-      const activeProfile = JSON.parse(fs.readFileSync(secureConfigPath, 'utf8'));
       let signer;
 
-      // Safely read and decrypt the stored hardware profile on the fly
-      if (activeProfile.method === 'privateKey') {
-        const encryptedBuffer = Buffer.from(activeProfile.secret, 'base64');
-        const rawKey = safeStorage.decryptString(encryptedBuffer); // Decrypt via OS key
-        signer = new ethers.Wallet(rawKey, provider);
-      } else if (activeProfile.method === 'mnemonic') {
-        const encryptedBuffer = Buffer.from(activeProfile.secret, 'base64');
-        const rawPhrase = safeStorage.decryptString(encryptedBuffer);
-        signer = ethers.Wallet.fromPhrase(rawPhrase, provider);
-      } else if (activeProfile.method === 'keystore') {
-        const rawJson = Buffer.from(activeProfile.secret, 'base64').toString('utf8');
-        let pass = "";
-        const kpPath = path.join(app.getPath('userData'), '.kp');
-        if (fs.existsSync(kpPath)) {
-          pass = safeStorage.decryptString(Buffer.from(fs.readFileSync(kpPath, 'utf8'), 'base64'));
+      try {
+        // 2. Read the secret directly out of your activeAdminSession RAM variable
+        if (activeAdminSession.method === 'privateKey') {
+          signer = new ethers.Wallet(activeAdminSession.secret, provider);
+
+        } else if (activeAdminSession.method === 'mnemonic') {
+          signer = ethers.Wallet.fromPhrase(activeAdminSession.secret, provider);
+
+        } else if (activeAdminSession.method === 'keystore') {
+          // If it's a keystore file, read the secret string and the password from RAM
+          let rawJson = activeAdminSession.secret;
+          const pass = activeAdminSession.password || "";
+          
+          signer = await ethers.Wallet.fromEncryptedJson(rawJson, pass);
+          signer = signer.connect(provider);
+
+        } else {
+          return { status: "Error", error: "Unsupported structural signing key type." };
         }
-        signer = await ethers.Wallet.fromEncryptedJson(rawJson, pass);
-        signer = signer.connect(provider);
-      } else {
-        return { status: "Error", error: "Unsupported structural signing key type." };
+
+      } catch (err) {
+        console.error("Failed to build signer from memory session:", err);
+        return { status: "Error", error: `Signer hydration failed: ${err.message}` };
       }
 
       console.log(`Executing contract state modification using signer: ${signer.address}`);
