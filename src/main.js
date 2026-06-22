@@ -765,7 +765,7 @@ ipcMain.handle('submitDeposit', async (event, payload) => {
 
   // Bind execution client configuration deployment target
   // Ensure deployments.AcquisitionGateway or deployments.VaultManager target maps appropriately here
-  const targetContractAddress = deployments.AcquisitionGateway; 
+  const targetContractAddress = deployments.GlobalSheild; 
   console.log(`Executing Deposit execution vector utilizing signer: ${signer.address}`);
   const mainContract = new ethers.Contract(targetContractAddress, CONTRACT_ABI, signer);
 
@@ -856,7 +856,7 @@ ipcMain.handle('submitWithdrawal', async (event, payload) => {
     return { status: "Error", error: `Signer hydration failed: ${err.message}` };
   }
 
-  const targetContractAddress = deployments.AcquisitionGateway;
+  const targetContractAddress = deployments.GlobalSheild;
   console.log(`Executing Withdrawal execution vector utilizing signer: ${signer.address}`);
   const mainContract = new ethers.Contract(targetContractAddress, CONTRACT_ABI, signer);
 
@@ -929,7 +929,7 @@ ipcMain.handle('submit-acquisition', async (event, payload) => {
   }
 
   console.log(`Executing contract state modification using signer: ${signer.address}`);
-  const mainContract = new ethers.Contract(deployments.AcquisitionGateway, CONTRACT_ABI, signer);
+  const mainContract = new ethers.Contract(deployments.GlobalSheild, CONTRACT_ABI, signer);
 
   try {
     const { 
@@ -1008,7 +1008,7 @@ ipcMain.handle('submit-user-liquidate', async (event, payload) => {
   }
 
   console.log(`Executing contract state modification using signer: ${signer.address}`);
-  const mainContract = new ethers.Contract(deployments.AcquisitionGateway, contractABI, signer);
+  const mainContract = new ethers.Contract(deployments.GlobalSheild, contractABI, signer);
 
   try {
     const { payoutTokenAddress, amountToCashOut } = payload;
@@ -1292,7 +1292,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       }
 
       console.log(`Executing contract state modification using signer: ${signer.address}`);
-      const writeableContract = new ethers.Contract(deployments.AssetPurchase, CONTRACT_ABI, signer);
+      const writeableContract = new ethers.Contract(deployments.GlobalSheild, CONTRACT_ABI, signer);
 
       // 2. Parse and normalize parameters to fit your flat function arguments
       const buyerAddress = buyerWalletAddress;
