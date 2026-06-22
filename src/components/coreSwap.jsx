@@ -1,6 +1,6 @@
 // src/components/coreSwap.jsx
 import React, { useState, useEffect } from 'react';
-import { styles } from '../utils/styles.jsx';
+import { styles, modalStyles } from '../utils/styles.jsx';
 import { deployments, supportedTokens, dividendTokens } from '../utils/tokensX';
 
 function formatMoneyFromDigits(raw) {
@@ -64,42 +64,6 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
           )
       ),
   ];
-
-  const modalStyles = {
-    overlay: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.75)", // Dim backend background
-        backdropFilter: "blur(4px)",            // Soft blur effect
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,                           // Keep on top of page content
-        padding: "20px"
-    },
-    content: {
-        backgroundColor: "#1c1c1c",            // Matches a typical dark theme card surface
-        borderRadius: "8px",
-        width: "100%",
-        maxWidth: "900px",                      // Gives ample space for side-by-side structures
-        boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
-        position: "relative",
-        maxHeight: "90vh",
-        overflowY: "auto"                       // Ensures scrollability if viewing window shrinks
-    },
-    closeButton: {
-        background: "none",
-        border: "none",
-        color: "#888",
-        fontSize: "20px",
-        cursor: "pointer",
-        padding: "4px 8px",
-        transition: "color 0.2s"
-    }
-  };
 
   useEffect(() => {
     if (userAddress) {
@@ -307,12 +271,12 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0 }}>
             <span style={{ color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>TOTAL DEPLOYED SWAPS</span>
             <hr style={styles.divider} />
-            <b style={{ fontSize: "16px", fontFamily: "monospace", color: "#fff" }}>{totals.totalSwaps} <span style={{fontSize:"12px", color:"#555"}}>CLONES</span></b>
+            <b style={{ fontSize: "16px", fontFamily: "monospace", color: "#fff" }}>{totals.totalSwaps} <span style={{fontSize:"12px", color:"#555"}}>INSTANCES</span></b>
           </div>
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0, border: "1px solid rgba(74, 222, 128, 0.15)" }}>
             <span style={{ color: "#1d5c34", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>ACTIVE PENDING ESCROWS</span>
             <hr style={styles.divider} />
-            <b style={{ fontSize: "16px", fontFamily: "monospace", color: "#1d5c34" }}>{totals.pendingCount} <span style={{fontSize:"12px", color:"#2e7d43"}}>OPEN STATUS</span></b>
+            <b style={{ fontSize: "16px", fontFamily: "monospace", color: "#1d5c34" }}>{totals.pendingCount} <span style={{fontSize:"12px", color:"#2e7d43"}}>OPEN</span></b>
           </div>
         </div>
       )}

@@ -34,7 +34,10 @@ const CONTRACT_ABI = [
   "function getDepositUser(address user, uint256 index) external view returns (tuple(address user, uint256 index) memory)",
   "function purchase(address buyer, address stable, uint256 productId, uint256 amount, uint256 shipping, uint256 customizations, bytes32 configs, uint256 quantity, uint256 rate, address affiliate, uint256 commission, uint256 region, bytes32 depositHash, uint256 purchaseTimeStamp) external",
   "function acquisition(address user, address token, uint256 amountin, uint256 amountout, uint256 rate, uint256 currentTxTime, bytes32 depositHash) external nonReentrant",
-  "function liquidate(address payoutToken, uint256 amount, uint256 timeStamp) external"
+  "function liquidate(address payoutToken, uint256 amount, uint256 timeStamp) external",
+  "function deposit(uint256 timeStamp, address investor, address token, uint256 amount, uint256 committedQuarters, uint256 incomingRate, bytes32 depositHash) external payable",
+  "function deposit(uint256 timeStamp, address user, address token, address venture, uint256 amount, uint256 incomingRate, bytes32 depositHash) external payable",
+  "function withdraw(address dividendTokenOrVenture, address payToken, uint256 holderBalance, uint256 timeStamp) external payable"
 ];
 
 const decimalsCache = {};
@@ -730,6 +733,162 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
   } catch (error) {
     console.error("Backend dual-ABI portfolio serialization processing crashed:", error);
     throw error;
+  }
+});
+
+ipcMain.handle('submitDeposit', async (event, payload) => {
+  const provider = providers.globalChain;
+
+  // Wallet profile state validation matching core system guidelines
+  if (!activeAdminSession || !activeAdminSession.isConnected) {
+    return { status: "Error", error: "No active admin wallet profile loaded in session memory." };
+  }
+
+  let signer;
+  try {
+    if (activeAdminSession.method === 'privateKey') {
+      signer = new ethers.Wallet(activeAdminSession.secret, provider);
+    } else if (activeAdminSession.method === 'mnemonic') {
+      signer = ethers.Wallet.fromPhrase(activeAdminSession.secret, provider);
+    } else if (activeAdminSession.method === 'keystore') {
+      let rawJson = activeAdminSession.secret;
+      const pass = activeAdminSession.password || "";
+      signer = await ethers.Wallet.fromEncryptedJson(rawJson, pass);
+      signer = signer.connect(provider);
+    } else {
+      return { status: "Error", error: "Unsupported structural signing key type." };
+    }
+  } catch (err) {
+    console.error("Failed to build signer from memory session:", err);
+    return { status: "Error", error: `Signer hydration failed: ${err.message}` };
+  }
+
+  // Bind execution client configuration deployment target
+  // Ensure deployments.AcquisitionGateway or deployments.VaultManager target maps appropriately here
+  const targetContractAddress = deployments.AcquisitionGateway; 
+  console.log(`Executing Deposit execution vector utilizing signer: ${signer.address}`);
+  const mainContract = new ethers.Contract(targetContractAddress, CONTRACT_ABI, signer);
+
+  try {
+    const {
+      depositType,         // "SMART_VAULT" || "VENTURE_VAULT"
+      timeStamp,           // Passed from view layer runtime block
+      userAddress,         // Wallet address of target client user
+      tokenAddress,        // Input asset address
+      ventureAddress,      // Target Venture Node contract address (Venture Only)
+      amountIn,            // Raw or parsed user amount string
+      committedQuarters,   // Lock duration parameter (Smart Vault Only)
+      incomingRate         // Calculated conversion exchange rate mapping value
+    } = payload;
+
+    // Secure string parsing to BigInt (assuming standard 18 decimal formatting assets)
+    const parsedAmount = ethers.parseUnits(amountIn.toString(), 18);
+    const parsedRate = ethers.parseUnits(incomingRate.toString(), 18);
+    const formattedHash = payload.depositHash.startsWith("0x") ? payload.depositHash : `0x${payload.depositHash}`;
+
+    let tx;
+
+    if (depositType === "SMART_VAULT") {
+      console.log(`[Electron Backend] Executing Smart Vault Deposit for user: ${userAddress}`);
+      const parsedQuarters = BigInt(committedQuarters || 0);
+
+      // Invoke overloaded Smart Vault layout function explicitly
+      const depositFn = mainContract["deposit(uint256,address,address,uint256,uint256,uint256,bytes32)"];
+      tx = await depositFn(
+        BigInt(timeStamp),
+        userAddress,
+        tokenAddress,
+        parsedAmount,
+        parsedQuarters,
+        parsedRate,
+        formattedHash
+      );
+    } else {
+      console.log(`[Electron Backend] Executing Venture Vault Deposit for user: ${userAddress}`);
+      
+      // Invoke overloaded Venture Vault layout function explicitly
+      const depositFn = mainContract["deposit(uint256,address,address,address,uint256,uint256,bytes32)"];
+      tx = await depositFn(
+        BigInt(timeStamp),
+        userAddress,
+        tokenAddress,
+        ventureAddress,
+        parsedAmount,
+        parsedRate,
+        formattedHash
+      );
+    }
+
+    console.log(`[Deposit Transaction Broadcasted] Hash: ${tx.hash}`);
+    const receipt = await tx.wait();
+
+    return { success: true, txHash: receipt.hash };
+
+  } catch (error) {
+    console.error("[Electron Backend] Deposit Node Failure:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('submitWithdrawal', async (event, payload) => {
+  const provider = providers.globalChain;
+
+  if (!activeAdminSession || !activeAdminSession.isConnected) {
+    return { status: "Error", error: "No active admin wallet profile loaded in session memory." };
+  }
+
+  let signer;
+  try {
+    if (activeAdminSession.method === 'privateKey') {
+      signer = new ethers.Wallet(activeAdminSession.secret, provider);
+    } else if (activeAdminSession.method === 'mnemonic') {
+      signer = ethers.Wallet.fromPhrase(activeAdminSession.secret, provider);
+    } else if (activeAdminSession.method === 'keystore') {
+      let rawJson = activeAdminSession.secret;
+      const pass = activeAdminSession.password || "";
+      signer = await ethers.Wallet.fromEncryptedJson(rawJson, pass);
+      signer = signer.connect(provider);
+    } else {
+      return { status: "Error", error: "Unsupported structural signing key type." };
+    }
+  } catch (err) {
+    console.error("Failed to build signer from memory session:", err);
+    return { status: "Error", error: `Signer hydration failed: ${err.message}` };
+  }
+
+  const targetContractAddress = deployments.AcquisitionGateway;
+  console.log(`Executing Withdrawal execution vector utilizing signer: ${signer.address}`);
+  const mainContract = new ethers.Contract(targetContractAddress, CONTRACT_ABI, signer);
+
+  try {
+    const {
+      targetAddress,       // maps dynamically to dividendToken or venture address
+      payToken,            // token payout channel address
+      holderBalance,       // raw validation asset account metrics string
+      timeStamp            // action transaction execution time tracker log
+    } = payload;
+
+    console.log(`[Electron Backend] Routing withdrawal settlement request targeting node ${targetAddress}...`);
+
+    const parsedBalance = ethers.parseUnits(holderBalance.toString(), 18);
+
+    // Dynamic execution of universal matching function template
+    // Signature: withdraw(address,address,uint256,uint256)
+    const tx = await mainContract.withdraw(
+      targetAddress,
+      payToken,
+      parsedBalance,
+      BigInt(timeStamp)
+    );
+
+    console.log(`[Withdrawal Transaction Broadcasted] Hash: ${tx.hash}`);
+    const receipt = await tx.wait();
+
+    return { success: true, txHash: receipt.hash };
+
+  } catch (error) {
+    console.error("[Electron Backend] Withdrawal Node Failure:", error);
+    return { success: false, error: error.message };
   }
 });
 

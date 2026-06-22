@@ -1,7 +1,7 @@
 // src/components/CorePortfolioMatrix.jsx
 import React, { useState, useEffect } from 'react';
-import { styles } from '../utils/styles.jsx';
-import { deployments } from '../utils/tokensX.js';
+import { styles, modalStyles } from '../utils/styles.jsx';
+import { deployments, supportedTokens, dividendTokens } from '../utils/tokensX.js';
 
 export default function CorePortfolioMatrix({ userAddress, activeContract, isConnected }) {
   // Aggregate Overview Totals (For the "TO DATE:" Section Headers)
@@ -21,8 +21,248 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
   const [ventureWithdrawals, setVentureWithdrawals] = useState([]);
   const [allPurchases, setAllPurchases] = useState([]);
 
+  // Modal Visibility Toggles
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+
+  // Deposit Parameters State
+  const [depositType, setDepositType] = useState("SMART_VAULT"); // SMART_VAULT or VENTURE_VAULT
+  const [depositToken, setDepositToken] = useState("");
+  const [depositVentureAddress, setDepositVentureAddress] = useState(""); // <-- Added for Venture Deposit variant
+  const [depositAmount, setDepositAmount] = useState("");
+  const [committedQuarters, setCommittedQuarters] = useState(""); // Unique to Smart Vault
+  const [incomingRate, setIncomingRate] = useState("");
+  const [depositHash, setDepositHash] = useState("");
+  const [depositLoading, setDepositLoading] = useState(false);
+
+  const [depositor, setDepositor] = useState(false);
+
+  // Withdrawal Parameters State
+  const [withdrawType, setWithdrawType] = useState("SMART_VAULT"); 
+  const [targetVaultOrDividendToken, setTargetVaultOrDividendToken] = useState(""); 
+  const [payToken, setPayToken] = useState("");
+  const [holderBalance, setHolderBalance] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const handleExecuteDeposit = async () => {
+    // 1. Guard check: Ensure wallet state context is bound
+    if (!userAddress) {
+      alert("Please connect or enter a valid wallet address.");
+      return;
+    }
+
+    // 2. Structural Guard: Reject empty requests before hitting the node pipeline
+    const amountFloat = parseFloat(depositAmount);
+    if (!depositAmount || isNaN(amountFloat) || amountFloat <= 0) {
+      alert("Please enter a valid deposit amount greater than zero.");
+      return;
+    }
+
+    if (!depositToken) {
+      alert("Please provide a valid deposit asset token address.");
+      return;
+    }
+
+    if (!depositHash) {
+      alert("Missing Transaction Hash! You must provide the user's transaction payment hash.");
+      return;
+    }
+
+    if (!depositHash.startsWith("0x") || depositHash.length < 66) {
+      alert(`Invalid Hash Format! "${depositHash}" must be a 66-character hex string starting with 0x.`);
+      return;
+    }
+
+    if (depositType === "VENTURE_VAULT" && !depositVentureAddress) {
+      alert("Please provide the target venture contract address.");
+      return;
+    }
+
+    setDepositLoading(true);
+
+    try {
+      console.log(`Initiating pre-flight validations for ${depositAmount} against hash ${depositHash}...`);
+
+      // Mapped Target Treasury Vault Address Setup
+      const treasuryByContract = {
+        [deployments.AcquisitionGateway?.toLowerCase()]: "0x1166579617240592e8a7c87bc389549eab8de047"
+      };
+
+      const targetTreasuryVault = treasuryByContract[deployments.AcquisitionGateway?.toLowerCase()];
+      if (!targetTreasuryVault) {
+        throw new Error("Security System Error: Selected contract address does not have a mapped Treasury Vault.");
+      }
+
+      // --- SLIPPAGE & CONVERSION MATH ---
+      // Fetch system exchange rate dynamically from system cache/oracles
+      let tokenConversionRate = 1;
+      try {
+        const rateData = await getExchangeRates();
+        // Adjust this string parsing depending on how your state maps token entities
+        const paymentTokenSymbol = typeof depositToken === "object" ? depositToken.symbol : "TOKEN";
+        
+        if (paymentTokenSymbol && paymentTokenSymbol.toUpperCase() !== "GBDO") {
+          const rateEntry = rateData.rates.find((r) => r.symbol === paymentTokenSymbol);
+          if (rateEntry) tokenConversionRate = Number(rateEntry.rate);
+        }
+      } catch (e) {
+        console.warn("Pre-flight bridge check failed to read exchangeData pool.", e);
+      }
+
+      const computedAmountOut = amountFloat * tokenConversionRate;
+      const targetDecimalsBase18 = 18;
+      
+      const safeFixedString = computedAmountOut.toFixed(18).replace(/e[-+]\d+/, (match) => {
+        return Number(match).toFixed(18).split('e')[0];
+      });
+
+      const expectedTokensBase18 = ethers.parseUnits(safeFixedString, targetDecimalsBase18);
+      const ALLOWABLE_SLIPPAGE_PERCENT = 1; 
+      const slippageBasisPoints = 10000n - BigInt(ALLOWABLE_SLIPPAGE_PERCENT * 100);
+      const priceFloorBase18 = (expectedTokensBase18 * slippageBasisPoints) / 10000n;
+
+      console.clear(); 
+      console.group("SYSTEM INTEGRITY AUDIT REPORT: DEPOSIT");
+      console.table({
+        "Token Exchange FX Rate":   { Value: `${tokenConversionRate}`, Base18: "N/A" },
+        "Expected Tokens Target":   { Value: `${computedAmountOut.toFixed(4)} Units`, Base18: expectedTokensBase18.toString() },
+        "Slippage Floor Limit":     { Value: `${ethers.formatUnits(priceFloorBase18, 18)} Units`, Base18: priceFloorBase18.toString() },
+        "Current Raw Input Hash":   { Value: depositHash, Base18: "N/A" }
+      });
+      console.groupEnd();
+
+      // --- THE SHIELD LAYER (PRE-FLIGHT VALIDATION VIA BACKEND INDEXER) ---
+      let verificationResponse = null;
+      try {
+        verificationResponse = await window.api.triggerVault({
+          modeArg: "verify-erc20-receipt",
+          transactionHash: depositHash,
+          custodialWallet: targetTreasuryVault 
+        });
+      } catch (ipcError) {
+        console.error("IPC validation background pipe crashed:", ipcError);
+        verificationResponse = { ok: false, reason: "The verification server was unable to index the transaction." };
+      }
+
+      if (!verificationResponse || !verificationResponse.ok) {
+        throw new Error(verificationResponse?.reason || "Receipt was not found on the blockchain indexer.");
+      }
+
+      // Verify ownership and balance thresholds against checked chain receipt data
+      const rawLoggedTokenAmount = BigInt(verificationResponse.amount);
+      const actualDecimalsOfPaymentToken = verificationResponse.decimals ?? 18;
+      const normalizedPaidAmountBase18 = BigInt(
+        rescaleAmount(rawLoggedTokenAmount, actualDecimalsOfPaymentToken, targetDecimalsBase18)
+      );
+
+      if (verificationResponse.senderAddress.toLowerCase() !== userAddress.toLowerCase()) {
+        throw new Error(`Ownership Mismatch!\n• On-Chain Sender: ${verificationResponse.senderAddress}\n• State Wallet: ${userAddress}`);
+      }
+
+      if (normalizedPaidAmountBase18 < priceFloorBase18) {
+        throw new Error(`Slippage Violation! Amount detected on-chain is below acceptable price floor limits.`);
+      }
+
+      console.log("Receipt Verification Passed. Invoking main.js secure pipeline execution context...");
+
+      // --- COMPILING INTERACTION ROUTING PAYLOAD ---
+      const payload = {
+        depositType: depositType, // "SMART_VAULT" || "VENTURE_VAULT"
+        timeStamp: Math.floor(Date.now() / 1000),
+        userAddress: depositor,
+        tokenAddress: typeof depositToken === "object" ? depositToken.address : depositToken,
+        ventureAddress: depositType === "VENTURE_VAULT" ? depositVentureAddress : null,
+        amountIn: depositAmount,
+        committedQuarters: depositType === "SMART_VAULT" ? committedQuarters : "0",
+        incomingRate: tokenConversionRate.toString(),
+        depositHash: depositHash
+      };
+
+      // Invoke through IPC context bridge structure to backend main.js execution pipe
+      const result = await window.electronAPI.submitDeposit(payload);
+
+      if (result && result.success) {
+        console.log(`Deposit routing completed successfully. Tx Hash: ${result.txHash}`);
+        alert(`Transaction confirmed via main.js node framework!\nHash: ${result.txHash}`);
+        
+        // Cleanup inputs
+        setDepositAmount("");
+        setDepositHash("");
+        setDepositVentureAddress("");
+        setIsDepositModalOpen(false);
+      } else {
+        throw new Error(result?.error || "Transaction execution failed or reverted inside background pipeline.");
+      }
+
+    } catch (error) {
+      console.error("Critical Failure inside handleExecuteDeposit:", error);
+      alert(`Deposit Execution Rejected:\n\n${error.message || "Unknown execution error"}`);
+    } finally {
+      setDepositLoading(false);
+    }
+  };
+
+  const handleExecuteWithdrawal = async () => {
+    // 1. Guard check: Ensure wallet state context is bound
+    if (!userAddress) {
+      alert("Please connect or enter a valid wallet address.");
+      return;
+    }
+
+    // 2. Structural Guard: Reject empty input requests before hitting node layer
+    const balanceFloat = parseFloat(holderBalance);
+    if (!holderBalance || isNaN(balanceFloat) || balanceFloat <= 0) {
+      alert("Please enter a valid validation balance greater than zero.");
+      return;
+    }
+
+    if (!targetVaultOrDividendToken || !payToken) {
+      alert("Please fill in all target routing address contract locations.");
+      return;
+    }
+
+    setWithdrawLoading(true);
+
+    try {
+      console.log(`Processing infrastructure withdrawal logic gates for ${withdrawType}...`);
+      
+      const timeStamp = Math.floor(Date.now() / 1000);
+
+      // --- COMPILING INTERACTION ROUTING PAYLOAD ---
+      const payload = {
+        withdrawType: withdrawType, // "SMART_VAULT" || "VENTURE_VAULT"
+        targetAddress: targetVaultOrDividendToken, // dividendToken (Smart) OR venture (Venture) address parameters
+        payToken: payToken,
+        holderBalance: holderBalance,
+        timeStamp: timeStamp
+      };
+
+      // Invoke through IPC context bridge structure to backend main.js execution pipe
+      const result = await window.electronAPI.submitWithdrawal(payload);
+
+      if (result && result.success) {
+        console.log(`Withdrawal routing completed successfully. Tx Hash: ${result.txHash}`);
+        alert(`Withdrawal confirmed via main.js node framework!\nHash: ${result.txHash}`);
+        
+        // Cleanup inputs
+        setHolderBalance("");
+        setTargetVaultOrDividendToken("");
+        setPayToken("");
+        setIsWithdrawModalOpen(false);
+      } else {
+        throw new Error(result?.error || "Transaction execution failed or reverted inside background withdrawal pipeline.");
+      }
+
+    } catch (error) {
+      console.error("Critical Failure inside handleExecuteWithdrawal:", error);
+      alert(`Withdrawal Execution Rejected:\n\n${error.message || "Unknown execution error"}`);
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchNativeOnChainData = async () => {
@@ -171,7 +411,17 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
 
       <div style={{ paddingTop: "8px", marginBottom: "6px", paddingBottom: "6px" }}>
         <h1 style={{ ...styles.title, fontSize: "18px", fontWeight: "100", margin: 0, paddingBottom: "10px" }}>INVESTOR PORTAL</h1>
-      </div>  
+      </div>
+
+      {/* ACTION TRIGGERS BAR */}
+      <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
+        <button style={styles.btnForestGreen} onClick={() => setIsDepositModalOpen(true)}>
+          OPEN PORTFOLIO DEPOSIT
+        </button>
+        <button style={styles.btnForestGreen} onClick={() => setIsWithdrawModalOpen(true)}>
+          OPEN ASSET WITHDRAWAL
+        </button>
+      </div>
 
       {/* ACCESS & OPERATIONAL MONITOR */}
       {(!isConnected || error || loading) && (
@@ -574,6 +824,208 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
         </div>
 
       </div>
+      {/* --- MODAL 1: SMART VAULT & VENTURE DEPOSIT PIPELINE --- */}
+      {isDepositModalOpen && (
+        <div style={modalStyles.overlay} onClick={() => setIsDepositModalOpen(false)}>
+          <div style={modalStyles.content} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...styles.sectionCard, width: "100%", boxSizing: "border-box", margin: 0, border: "none" }}>
+              
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #141414", paddingBottom: "8px", marginBottom: "16px" }}>
+                <h2 style={{ ...styles.sectionTitle, margin: 0 }}>CORE PORTFOLIO DEPOSIT PIPELINE</h2>
+                <button style={modalStyles.closeButton} onClick={() => setIsDepositModalOpen(false)}>✕</button>
+              </div>
+
+              {/* INTERACTION SELECTOR MATRIX */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={styles.label}>SELECT DEPOSIT CONTRACT METHOD TARGET</label>
+                <select style={styles.inputElement} value={depositType} onChange={(e) => setDepositType(e.target.value)}>
+                  <option value="SMART_VAULT" style={{ background: "#121212" }}>Smart Vault Deposit (Lock Quarters Execution)</option>
+                  <option value="VENTURE_VAULT" style={{ background: "#121212" }}>Venture Vault Deposit (Direct Asset Routing)</option>
+                </select>
+              </div>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", alignItems: "start" }}>
+                {/* LEFT COLUMN */}
+                <div>
+                  <label style={styles.label}>USER ADDRESS</label>
+                  <input
+                    type="text"
+                    placeholder="0x..."
+                    style={styles.sidebarInput}
+                    value={depositor}
+                    onChange={(e) => setDepositor(e.target.value)}
+                  />
+
+                  <div style={{ marginTop: "12px" }}>
+                    <label style={styles.label}>DEPOSIT ASSET (TOKEN)</label>
+                    <select 
+                      style={styles.inputElement} 
+                      value={depositToken}
+                      onChange={(e) => setDepositToken(e.target.value)}
+                    >
+                      <option value="" disabled style={{ background: "#121212" }}>
+                        Select {depositType === "deposit" ? "Deposit" : "Withdrawal"} Asset
+                      </option>
+                      {Array.isArray(supportedTokens) && supportedTokens
+                        .filter((token) => !["BTC", "LINK", "ETH", "UNI", "MATIC", "COPx"].includes(token.symbol))
+                        .map((token) => (
+                        <option key={`tokenB-${token.address}`} value={token.symbol} style={{ background: "#121212" }}>
+                          {token.symbol} ({token.name || token.chain})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ marginTop: "12px" }}>
+                    <label style={styles.label}>DEPOSIT AMOUNT (UINT256)</label>
+                    <input type="text" inputMode="decimal" placeholder="Enter raw token units" style={styles.inputElement} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN */}
+                <div>
+                  {/* DYNAMIC SLOT: Swaps Committed Quarters for Venture Token Selection seamlessly */}
+                  {depositType === "SMART_VAULT" ? (
+                    <div>
+                      <label style={styles.label}>COMMITTED QUARTERS (DURATION)</label>
+                      <input type="text" placeholder="e.g. 4" style={styles.inputElement} value={committedQuarters} onChange={(e) => setCommittedQuarters(e.target.value)} />
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={styles.label}>TARGET VENTURE CONTRACT</label>
+                      <select 
+                        style={styles.inputElement} 
+                        value={depositVentureAddress} 
+                        onChange={(e) => setDepositVentureAddress(e.target.value)}
+                      >
+                        <option value="" disabled style={{ background: "#121212" }}>Select Venture Asset</option>
+                        {dividendTokens
+                          .filter((token) => ["TGMX", "TGUSA", "CGRi", "CREs", "CREh", "GLB"].includes(token.symbol))
+                          .map((token) => (
+                            <option key={`deposit-venture-${token.address}`} value={token.address} style={{ background: "#121212" }}>
+                              {token.symbol} — {token.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: "12px" }}>
+                    <label style={styles.label}>DEPOSIT RECORD HASH (BYTES32)</label>
+                    <input type="text" placeholder="0x..." style={{ ...styles.inputElement, fontFamily: "monospace" }} value={depositHash} onChange={(e) => setDepositHash(e.target.value)} />
+                  </div>
+
+                  <div style={{ marginTop: "12px" }}>
+                    <label style={{ ...styles.label, color: "#888" }}>INCOMING RATE INDEX</label>
+                    <input type="text" disabled style={{ ...styles.inputElement, color: "#555" }} value="System Handled (Passed at Call Execution)" />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: "20px", borderTop: "1px solid #141414", paddingTop: "16px", display: "flex", justifyContent: "flex-end" }}>
+                <button 
+                  style={{ ...styles.btnForestGreen, width: "auto", paddingLeft: "32px", paddingRight: "32px" }} 
+                  onClick={handleExecuteDeposit} 
+                  disabled={depositLoading || !depositToken || (depositType === "VENTURE_VAULT" && !depositVentureAddress)}
+                >
+                  {depositLoading ? "SUBMITTING DEPOSIT ROUTINE..." : "EXECUTE DEPOSIT"}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 2: VAULT & VENTURE SETTLED WITHDRAWAL --- */}
+      {isWithdrawModalOpen && (
+        <div style={modalStyles.overlay} onClick={() => setIsWithdrawModalOpen(false)}>
+          <div style={modalStyles.content} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...styles.sectionCard, width: "100%", boxSizing: "border-box", margin: 0, border: "none" }}>
+              
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #141414", paddingBottom: "8px", marginBottom: "16px" }}>
+                <h2 style={{ ...styles.sectionTitle, margin: 0 }}>PORTFOLIO ASSET SETTLEMENT & WITHDRAWAL</h2>
+                <button style={modalStyles.closeButton} onClick={() => setIsWithdrawModalOpen(false)}>✕</button>
+              </div>
+
+              {/* INTERACTION SELECTOR MATRIX */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={styles.label}>SELECT MATRIX CONTRACT TYPE</label>
+                <select style={styles.inputElement} value={withdrawType} onChange={(e) => { setWithdrawType(e.target.value); setTargetVaultOrDividendToken(""); }}>
+                  <option value="SMART_VAULT" style={{ background: "#121212" }}>Smart Vault Framework (Dividend Asset Settlement)</option>
+                  <option value="VENTURE_VAULT" style={{ background: "#121212" }}>Venture Vault Framework (Infrastructure Settle)</option>
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", alignItems: "start" }}>
+                {/* LEFT COLUMN */}
+                <div>
+                  <div>
+                    <label style={styles.label}>
+                      {withdrawType === "SMART_VAULT" ? "SELECT DIVIDEND TOKEN" : "SELECT VENTURE ASSET"}
+                    </label>
+                    <select 
+                      style={styles.inputElement} 
+                      value={targetVaultOrDividendToken} 
+                      onChange={(e) => setTargetVaultOrDividendToken(e.target.value)}
+                    >
+                      <option value="" disabled style={{ background: "#121212" }}>
+                        {withdrawType === "SMART_VAULT" ? "Select Dividend Target" : "Select Venture Target"}
+                      </option>
+                      {dividendTokens.map((token) => (
+                        <option key={`withdraw-target-${token.address}`} value={token.address} style={{ background: "#121212" }}>
+                          {token.symbol} — {token.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ marginTop: "12px" }}>
+                    <label style={styles.label}>PAYOUT TOKEN</label>
+                    <select 
+                      style={styles.inputElement} 
+                      value={payToken}
+                      onChange={(e) => setPayToken(e.target.value)}
+                    >
+                      <option value="" disabled style={{ background: "#121212" }}>
+                        Select {withdrawType === "deposit" ? "Deposit" : "Withdrawal"} Asset
+                      </option>
+                      {Array.isArray(supportedTokens) && supportedTokens
+                        .filter((token) => !["BTC", "COPx"].includes(token.symbol))
+                        .map((token) => (
+                        <option key={`tokenB-${token.address}`} value={token.symbol} style={{ background: "#121212" }}>
+                          {token.symbol} ({token.name || token.chain})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN */}
+                <div>
+                  <label style={styles.label}>HOLDER AMOUNT TO REDEEM</label>
+                  <input type="text" placeholder="Enter total asset validation balance" style={styles.inputElement} value={holderBalance} onChange={(e) => setHolderBalance(e.target.value)} />
+                  
+                  <div style={{ marginTop: "12px" }}>
+                    <label style={styles.label}>SYSTEM TIMESTAMP (GENERIC LOG)</label>
+                    <input type="text" disabled style={{ ...styles.inputElement, color: "#666" }} value="Auto-generated on runtime signature" />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: "20px", borderTop: "1px solid #141414", paddingTop: "16px", display: "flex", justifyContent: "flex-end" }}>
+                <button 
+                  style={{ ...styles.btnForestGreen, width: "auto", paddingLeft: "32px", paddingRight: "32px" }} 
+                  onClick={() => console.log(`Triggering ${withdrawType} withdraw:`, { targetAddress: targetVaultOrDividendToken, payToken, holderBalance, timestamp: Math.floor(Date.now() / 1000) })} 
+                  disabled={withdrawLoading || !isConnected || !targetVaultOrDividendToken || !payToken}
+                >
+                  {withdrawLoading ? "PROCESSING CLEARING CYCLE..." : "EXECUTE WITHDRAWAL"}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

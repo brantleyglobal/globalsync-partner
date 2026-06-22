@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   submitAcquisition: (payload) => 
     ipcRenderer.invoke('submit-acquisition', payload),
 
+  submitDeposit: (payload) =>
+    ipcRenderer.invoke('submitDeposit', payload),
+  
+  submitWithdrawal: (payload) =>
+    ipcRenderer.invoke('submitWithdrawal', payload),
+
   submitUserLiquidate: (payload) => 
     ipcRenderer.invoke('submit-user-liquidate', payload),
 

@@ -195,3 +195,39 @@ export const styles = {
     margin: 0,
   }
 };
+
+export const modalStyles = {
+    overlay: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.75)", // Dim backend background
+        backdropFilter: "blur(4px)",            // Soft blur effect
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1000,                           // Keep on top of page content
+        padding: "20px"
+    },
+    content: {
+        backgroundColor: "#1c1c1c",            // Matches a typical dark theme card surface
+        borderRadius: "8px",
+        width: "100%",
+        maxWidth: "900px",                      // Gives ample space for side-by-side structures
+        boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
+        position: "relative",
+        maxHeight: "90vh",
+        overflowY: "auto"                       // Ensures scrollability if viewing window shrinks
+    },
+    closeButton: {
+        background: "none",
+        border: "none",
+        color: "#888",
+        fontSize: "20px",
+        cursor: "pointer",
+        padding: "4px 8px",
+        transition: "color 0.2s"
+    }
+  };

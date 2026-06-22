@@ -1,9 +1,11 @@
 // src/components/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
+import { ethers } from "ethers";
 import { styles } from '../utils/styles.jsx';
 import logo from '../assets/logo.png';
 import { supportedTokens } from '../utils/tokensX';
 import { getExchangeRates } from "../utils/exchangeRates";
+import { deployments } from "../utils/deploymentsX";
 
 function formatMoneyFromDigits(raw) {
   // Remove all non‑digits (Type annotation safely removed)
@@ -85,6 +87,7 @@ export default function Sidebar({
   const [isOpen, setIsOpen] = useState(false);
 
   const [transactionType, setTransactionType] = useState("deposit");
+  const [depositHash, setDepositHash] = useState("");
 
   // Automatically resolves the hex contract address right before submitting 
   const targetTokenObj = supportedTokens?.find(t => t.symbol === pledgedToken);
@@ -120,7 +123,123 @@ export default function Sidebar({
       // Generate a pseudo-random, unique tracking hash for the smart contract's replay guard
       // We append the timestamp to a standard 32-byte hex template string
       const uniqueNonce = Math.floor(Math.random() * 1000000);
-      const depositHash = `0x${Buffer.from(`DEP-${Date.now()}-${uniqueNonce}`).toString('hex').padEnd(64, '0')}`.slice(0, 66);
+      //const depositHash = `0x${Buffer.from(`DEP-${Date.now()}-${uniqueNonce}`).toString('hex').padEnd(64, '0')}`.slice(0, 66);
+
+      const treasuryByContract = {
+        [deployments.AcquisitionGateway?.toLowerCase()]: "0x1166579617240592e8a7c87bc389549eab8de047"
+      };
+  
+      const targetTreasuryVault = treasuryByContract[deployments.AcquisitionGateway.toLowerCase()];
+      if (!targetTreasuryVault) {
+        return alert(`Security System Error: Selected contract address does not have a mapped Treasury Vault.`);
+      }
+  
+      try {
+        console.log(`Executing pre-flight receipt window validation against Treasury: ${targetTreasuryVault}`);
+  
+        let tokenConversionRate; 
+        try {
+          const rateData = await getExchangeRates();
+          const paymentTokenSymbol = pledgedToken.symbol; 
+  
+          if (paymentTokenSymbol && paymentTokenSymbol.toUpperCase() !== "GBDO") {
+            // Strict lookup against your already-guarded rates array
+            const rateEntry = rateData.rates.find(
+              (r) => r.symbol === paymentTokenSymbol
+            );
+            
+            if (rateEntry) {
+              tokenConversionRate = Number(rateEntry.rate);
+            } else {
+              // If this logs, the symbol in your state doesn't match the symbol in your rates array
+              console.error(`[Lookup Error] Could not find match for "${paymentTokenSymbol}" in rates pool:`, rateData.rates.map(r => r.symbol));
+            }
+          }
+        } catch (e) {
+          console.warn("Pre-flight bridge check failed to read exchangeData pool.", e);
+        }
+  
+        const targetDecimalsBase18 = 18;
+        
+        const safeFixedString = computedAmountOut.toFixed(18).replace(/e[-+]\d+/, (match) => {
+          return Number(match).toFixed(18).split('e')[0];
+        });
+  
+        const expectedTokensBase18 = ethers.parseUnits(safeFixedString, targetDecimalsBase18);
+        const ALLOWABLE_SLIPPAGE_PERCENT = 1; 
+        const slippageBasisPoints = 10000n - BigInt(ALLOWABLE_SLIPPAGE_PERCENT * 100);
+        const priceFloorBase18 = (expectedTokensBase18 * slippageBasisPoints) / 10000n;
+  
+        console.clear(); 
+        console.group("SYSTEM INTEGRITY AUDIT REPORT");
+        console.table({
+          "Token Exchange FX Rate":   { Value: `${exchangeRate} ${pledgedToken.symbol}`, Base18: "N/A" },
+          "Expected Tokens Target":   { Value: `${computedAmountOut.toFixed(4)} Units`, Base18: expectedTokensBase18.toString() },
+          "Slippage Floor Limit":     { Value: `${ethers.formatUnits(priceFloorBase18, 18)} Units`, Base18: priceFloorBase18.toString() },
+          "Current Raw Input Hash":   { Value: depositHash || "EMPTY/NOT PROVIDED", Base18: "N/A" }
+        });
+        console.groupEnd();
+  
+        if (!depositHash) {
+          throw new Error("Missing Transaction Hash! You must provide the user's transaction payment hash.");
+        }
+        if (!depositHash.startsWith("0x") || depositHash.length < 66) {
+          throw new Error(`Invalid Hash Format! "${depositHash}" must be a 66-character hex string starting with 0x.`);
+        }
+  
+        let verificationResponse = null;
+  
+        // --- THE SHIELD LAYER ---
+        try {
+          verificationResponse = await window.api.triggerVault({
+            modeArg: "verify-erc20-receipt",
+            transactionHash: depositHash,
+            custodialWallet: targetTreasuryVault 
+          });
+        } catch (ipcError) {
+          // Direct the technical background crash straight to the console log
+          console.error("IPC validation background pipe crashed:", ipcError);
+          
+          // Mock a clean rejection profile so the code handles it smoothly down below
+          verificationResponse = { ok: false, reason: "The verification server was unable to index the transaction. Please ensure it is confirmed on-chain." };
+        }
+  
+        if (!verificationResponse || !verificationResponse.ok) {
+          throw new Error(verificationResponse?.reason || "Receipt was not found on the blockchain indexer.");
+        }
+  
+        const rawLoggedTokenAmount = BigInt(verificationResponse.amount);
+        const actualDecimalsOfPaymentToken = verificationResponse.decimals ?? targetDecimals ?? 18;
+        const normalizedPaidAmountBase18 = BigInt(
+          rescaleAmount(rawLoggedTokenAmount, actualDecimalsOfPaymentToken, targetDecimalsBase18)
+        );
+  
+        console.log(`[AUDIT RECEIPT] Actual Payment Detected: ${ethers.formatUnits(normalizedPaidAmountBase18, 18)} Units`);
+  
+        if (verificationResponse.senderAddress.toLowerCase() !== targetUserWallet.toLowerCase()) {
+          throw new Error(
+            `Ownership Mismatch!\n` +
+            `• On-Chain Sender: ${verificationResponse.senderAddress.toLowerCase()}\n` +
+            `• Target State Wallet: ${targetUserWallet.toLowerCase()}`
+          );
+        }
+  
+        if (normalizedPaidAmountBase18 < priceFloorBase18) {
+          const varianceBase18 = priceFloorBase18 - normalizedPaidAmountBase18;
+          throw new Error(
+            `Slippage Violation! The transacted amount is too low.\n` +
+            `• Required Floor: ${ethers.formatUnits(priceFloorBase18, 18)} tokens\n` +
+            `• Received Amount: ${ethers.formatUnits(normalizedPaidAmountBase18, 18)} tokens`
+          );
+        }
+  
+        console.log("Receipt Verification Passed. Moving smoothly to step 2...");
+  
+      } catch (verifyError) {
+        console.error("PRE-FLIGHT AUDIT REJECTION:", verifyError.message);
+        alert(`PRE-FLIGHT VALIDATION CRASHED:\n\n${verifyError.message}`);
+        return; 
+      }
 
       // Construct the exact payload payload format expected by main.js
       const payload = {
@@ -144,7 +263,8 @@ export default function Sidebar({
         if (typeof setPledgedAmount === "function") setPledgedAmount("");
         
         // Close out the toggle parameters to minimize cleartext remnants
-        if (typeof setShowPurchaseDrawer === "function") setShowPurchaseDrawer(false); 
+        setPledgedAmount("");
+        setPledgedToken("");
         if (typeof setIsOpen === "function") setIsOpen(false);
       } else {
         // Handle cases where the promise resolved but the backend script failed
@@ -728,7 +848,7 @@ export default function Sidebar({
               
 
               {/* NATIVE PURCHASE & LIQUIDATION MODAL LAYER */}
-              {!isConnected && (
+              {isConnected && (
                 <>
                   <label style={styles.label}>ONBOARDING</label>
                   
@@ -818,6 +938,12 @@ export default function Sidebar({
                           }}
                         />
                       </div>
+                      {transactionType === "deposit" && (
+                      <div>
+                        <label style={styles.label}>DEPOSIT TRANSACTION HASH</label>
+                        <input type="text" placeholder="0x..." style={styles.inputElement} value={depositHash} onChange={(e) => setDepositHash(e.target.value)} />
+                      </div>
+                      )}
 
                       <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
 
@@ -879,7 +1005,7 @@ export default function Sidebar({
               {isConnected && (
                   <button 
                   type="button"
-                  onClick={handleDisconnectWallet}
+                  onClick={handleNativePurchase}
                   style={{
                       width: "100%",
                       padding: "8px",
@@ -949,19 +1075,6 @@ export default function Sidebar({
           </button>
 
           <button 
-              onClick={() => setPortalView('gateway')}
-              style={{
-              ...styles.navItem, 
-              background: portalView === 'gateway' ? "rgba(0, 0, 0, 0.36)" : "transparent",
-              color: portalView === 'gateway' ? "#5b6b5f" : "#777",
-              border: "1px solid " + (portalView === 'gateway' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
-              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
-              }}
-          >
-              GBDo GATEWAY
-          </button>
-
-          <button 
               onClick={() => setPortalView('swap')}
               style={{
               ...styles.navItem, 
@@ -971,7 +1084,20 @@ export default function Sidebar({
               padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
               }}
           >
-              XHANGE DASHBOARD
+              XCHANGE DASHBOARD
+          </button>
+
+          <button 
+              onClick={() => setPortalView('gateway')}
+              style={{
+              ...styles.navItem, 
+              background: portalView === 'gateway' ? "rgba(0, 0, 0, 0.36)" : "transparent",
+              color: portalView === 'gateway' ? "#5b6b5f" : "#777",
+              border: "1px solid " + (portalView === 'gateway' ? "rgba(0, 0, 0, 0.31)" : "transparent"),
+              padding: "8px 12px", textAlign: "left", borderRadius: "4px", fontSize: "9px", fontWeight: "lighter", cursor: "pointer"
+              }}
+          >
+              GBDo GATEWAY MATRIX
           </button>
 
           <button 

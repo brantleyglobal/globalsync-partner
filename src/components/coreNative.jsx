@@ -142,9 +142,9 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
       </div>  
 
       {/* ERROR / LOADING ALERTS */}
-      {error && (
+      {/*{error && (
         <div style={{ ...styles.jsonDisplay, color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.2)", marginBottom: "30px" }}>
-          <strong>LEDGER RESOLUTION ERROR:</strong> {error}
+          <strong>RESOLUTION ERROR:</strong> {error}
         </div>
       )}
 
@@ -166,14 +166,14 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
             </b>
           </div>
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0 }}>
-            <span style={{ color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>CUMULATIVE INGRESS (PURCHASE)</span>
+            <span style={{ color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>CUMULATIVE PURCHASES</span>
             <hr style={styles.divider} />
             <b style={{ fontSize: "16px", fontFamily: "monospace", fontWeight: "lighter", color: "#fff" }}>
               {metrics.totalDeposited.toFixed(4)} <span style={{ fontSize: "12px", color: "#555" }}>ASSETS</span>
             </b>
           </div>
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0, border: "1px solid rgba(239, 68, 68, 0.15)" }}>
-            <span style={{ color: "#ef4444", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>CUMULATIVE EGRESS (LIQUIDATE)</span>
+            <span style={{ color: "#ef4444", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>CUMULATIVE LIQUIDATIONS</span>
             <hr style={styles.divider} />
             <b style={{ fontSize: "16px", fontFamily: "monospace", fontWeight: "light", color: "#ef4444" }}>
               {metrics.totalLiquidated.toFixed(4)} <span style={{ fontSize: "12px", color: "rgba(239,68,68,0.5)" }}>ASSETS</span>
