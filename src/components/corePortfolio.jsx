@@ -169,17 +169,37 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
       console.log("Receipt Verification Passed. Invoking main.js secure pipeline execution context...");
 
       // --- COMPILING INTERACTION ROUTING PAYLOAD ---
-      const payload = {
-        depositType: depositType, // "SMART_VAULT" || "VENTURE_VAULT"
-        timeStamp: Math.floor(Date.now() / 1000),
-        userAddress: depositor,
-        tokenAddress: typeof depositToken === "object" ? depositToken.address : depositToken,
-        ventureAddress: depositType === "VENTURE_VAULT" ? depositVentureAddress : null,
-        amountIn: depositAmount,
-        committedQuarters: depositType === "SMART_VAULT" ? committedQuarters : "0",
-        incomingRate: tokenConversionRate.toString(),
-        depositHash: depositHash
-      };
+      
+      let payload;
+      const timeStamp = Math.floor(Date.now() / 1000);
+      const tokenAddress = typeof depositToken === "object" ? depositToken.address : depositToken;
+
+      // 2. Shift the structure based on the transaction type
+      if (depositType === "VENTURE_VAULT") {
+        payload = {
+          timeStamp,
+          user: depositor,
+          token: tokenAddress,
+          venture: depositVentureAddress,
+          amount: depositAmount,
+          incomingRate: tokenConversionRate.toString(),
+          depositHash
+        };
+
+        const tx = await mainContract.ventureDeposit(...Object.values(payload));
+        await tx.wait(1);
+
+      } else if (depositType === "SMART_VAULT") {
+        payload = {
+          timeStamp,
+          investor: depositor,
+          token: tokenAddress,
+          amount: depositAmount,
+          committedQuarters: committedQuarters,
+          incomingRate: tokenConversionRate.toString(),
+          depositHash
+        };
+      }
 
       // Invoke through IPC context bridge structure to backend main.js execution pipe
       const result = await window.electronAPI.submitDeposit(payload);

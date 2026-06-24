@@ -478,10 +478,12 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
     }
     const adminSigner = new ethers.Wallet(activeAdminSession.secret, providers.globalChain);
     const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, adminSigner);
+    const sheild = new ethers.Contract(deployments.GlobalSheild, REGISTRY_ABI, adminSigner);
+    const ts = Math.floor(Date.now() / 1000);
 
     // --- SUB-ROUTINE 2: DEPLOY NEW ESCROW ---
     if (action === "CREATE_SWAP") {
-      const tx = await registryContract.createNewSwap(
+      const tx = await registryContract.createSwap(
         payload.partyA,
         payload.partyB,
         payload.tokenA,
@@ -489,7 +491,8 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
         payload.partyADepositHash,
         payload.tokenB,
         payload.amountB,
-        payload.partyBDepositHash
+        payload.partyBDepositHash,
+        ts
       );
       const receipt = await tx.wait(1);
       return { success: true, txHash: receipt.hash };
@@ -497,25 +500,16 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
 
     // --- SUB-ROUTINE 3: DEPOSIT STEP ---
     if (action === "DEPOSIT") {
-      const tx = await registryContract.deposit(payload.targetSwapAddress, userAddress, payload.clearingHash);
+      const tx = await sheild.deposit(payload.targetSwapAddress, userAddress, payload.clearingHash, ts);
       const receipt = await tx.wait(1);
       return { success: true, txHash: receipt.hash };
     }
 
     // --- SUB-ROUTINE 4: REFUND STEP ---
     if (action === "REFUND") {
-      const tx = await registryContract.refund(payload.targetSwapAddress, userAddress, payload.clearingHash);
+      const tx = await sheild.refund(payload.targetSwapAddress, userAddress, payload.clearingHash);
       const receipt = await tx.wait(1);
       return { success: true, txHash: receipt.hash };
-    }
-
-    // --- SUB-ROUTINE 5: COMPLETE OUTRIGHT PAYOUTS ---
-    if (action === "EXECUTE_PAYOUT") {
-      const txA = await registryContract.markPartyAPayoutCompleted(payload.targetSwapAddress);
-      await txA.wait(1);
-      const txB = await registryContract.markPartyBPayoutCompleted(payload.targetSwapAddress);
-      const receiptB = await txB.wait(1);
-      return { success: true, txHash: receiptB.hash };
     }
 
     return { success: false, error: `Action variants matching request [${action}] unmapped.` };
@@ -793,29 +787,29 @@ ipcMain.handle('submitDeposit', async (event, payload) => {
       const parsedQuarters = BigInt(committedQuarters || 0);
 
       // Invoke overloaded Smart Vault layout function explicitly
-      const depositFn = mainContract["deposit(uint256,address,address,uint256,uint256,uint256,bytes32)"];
-      tx = await depositFn(
-        BigInt(timeStamp),
-        userAddress,
-        tokenAddress,
-        parsedAmount,
-        parsedQuarters,
-        parsedRate,
-        formattedHash
+      const depositFn = mainContract["vaultDeposit(uint256,address,address,uint256,uint256,uint256,bytes32)"];
+      const tx1 = await mainContract.ventureDeposit(
+        payload.timeStamp,
+        payload.user,
+        payload.token,
+        payload.venture,
+        payload.amount,
+        payload.incomingRate,
+        payload.depositHash
       );
     } else {
       console.log(`[Electron Backend] Executing Venture Vault Deposit for user: ${userAddress}`);
       
       // Invoke overloaded Venture Vault layout function explicitly
-      const depositFn = mainContract["deposit(uint256,address,address,address,uint256,uint256,bytes32)"];
-      tx = await depositFn(
-        BigInt(timeStamp),
-        userAddress,
-        tokenAddress,
-        ventureAddress,
-        parsedAmount,
-        parsedRate,
-        formattedHash
+      const depositFn = mainContract["ventureDeposit(uint256,address,address,address,uint256,uint256,bytes32)"];
+      const tx2 = await mainContract.vaultDeposit(
+        payload.timeStamp,
+        payload.investor,
+        payload.token,
+        payload.amount,
+        payload.committedQuarters,
+        payload.incomingRate,
+        payload.depositHash
       );
     }
 
@@ -1008,7 +1002,7 @@ ipcMain.handle('submit-user-liquidate', async (event, payload) => {
   }
 
   console.log(`Executing contract state modification using signer: ${signer.address}`);
-  const mainContract = new ethers.Contract(deployments.GlobalSheild, contractABI, signer);
+  const mainContract = new ethers.Contract(deployments.AcquisitionGateway, contractABI, signer);
 
   try {
     const { payoutTokenAddress, amountToCashOut } = payload;
