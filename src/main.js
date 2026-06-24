@@ -54,12 +54,34 @@ function createWindow() {
 
   const iconPath = path.join(__dirname, 'assets', `logo${iconExtension}`);
   
+  // 1. CREATE A SLEEK, FRAMELESS SPLASH WINDOW
+  const splash = new BrowserWindow({
+    width: 400,
+    height: 400,
+    frame: false,          // Removes the top window bar (close/minimize buttons)
+    transparent: true,      // Allows transparent logos if your PNG has no background
+    alwaysOnTop: true,      // Keeps it visible while the app boots up
+    resizable: false,
+    icon: iconPath
+  });
+
+  // Load a simple HTML string containing your image directly into the splash window
+  // (Using a regular <img> tag pointing directly to your local logo file)
+  splash.loadURL(`data:text/html;charset=utf-8,
+    <html style="margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;">
+      <body style="margin: 0; background: transparent; display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;">
+        <img src="file://${iconPath.replace(/\\/g, '/')}" style="width: 80%; height: auto; object-fit: contain;" />
+      </body>
+    </html>
+  `);
+
+  // 2. INITIALIZE YOUR MAIN WINDOW (Keep it completely hidden)
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: iconPath, 
-    show: false, // 1. HIDE THE WINDOW IMMEDIATELY (Kills the green flash)
-    backgroundColor: '#000000', // 2. Fallback dark background while loading in memory
+    show: false, // Hidden in memory
+    backgroundColor: '#000000', 
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -67,11 +89,15 @@ function createWindow() {
     }
   });
 
-  // 3. WAIT UNTIL THE PAGES RENDER BEFORE REVEALING THE WINDOW
+  // 3. THE SWAP: When the main page is ready, kill the splash and show the app
   win.once('ready-to-show', () => {
-    win.show();
+    setTimeout(() => {
+      splash.destroy(); // Closes the logo window safely
+      win.show();       // Opens your app layout seamlessly
+    }, 800); // Optional 800ms fade/hold cushion so the logo doesn't disappear too fast
   });
 
+  // --- Keep all your existing navigation handlers exactly as they are ---
   win.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith('http://localhost') && !url.startsWith('file://')) {
       event.preventDefault(); 
@@ -91,7 +117,6 @@ function createWindow() {
     win.loadFile(path.join(__dirname, 'dist', 'index.html')); 
   }
 }
-
 
 app.whenReady().then(() => {
   createWindow();
