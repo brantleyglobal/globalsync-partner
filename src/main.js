@@ -52,13 +52,14 @@ function createWindow() {
   if (process.platform === 'win32') iconExtension = '.ico';
   if (process.platform === 'darwin') iconExtension = '.icns';
 
-  // Looks at the project root for the OS shell icon
   const iconPath = path.join(__dirname, 'assets', `logo${iconExtension}`);
   
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: iconPath, 
+    show: false, // 1. HIDE THE WINDOW IMMEDIATELY (Kills the green flash)
+    backgroundColor: '#000000', // 2. Fallback dark background while loading in memory
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -66,15 +67,18 @@ function createWindow() {
     }
   });
 
+  // 3. WAIT UNTIL THE PAGES RENDER BEFORE REVEALING THE WINDOW
+  win.once('ready-to-show', () => {
+    win.show();
+  });
+
   win.webContents.on('will-navigate', (event, url) => {
-    // If the window tries to navigate away from localhost or your packaged local app files...
     if (!url.startsWith('http://localhost') && !url.startsWith('file://')) {
-      event.preventDefault(); // Stop it from opening inside Electron
-      shell.openExternal(url); // Force it out to Chrome/Safari
+      event.preventDefault(); 
+      shell.openExternal(url); 
     }
   });
 
-  // Keep your existing handler as back-up protection
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -84,7 +88,6 @@ function createWindow() {
     win.loadURL('http://localhost:5173');
     win.webContents.openDevTools();
   } else {
-    // THE FIX: '..' steps out of 'src/' so Electron can find the 'dist/' folder next to it
     win.loadFile(path.join(__dirname, 'dist', 'index.html')); 
   }
 }
