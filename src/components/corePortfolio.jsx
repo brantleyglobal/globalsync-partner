@@ -887,7 +887,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, isCon
                         Select {depositType === "deposit" ? "Deposit" : "Withdrawal"} Asset
                       </option>
                       {Array.isArray(supportedTokens) && supportedTokens
-                        .filter((token) => !["BTC", "LINK", "ETH", "UNI", "MATIC", "COPx"].includes(token.symbol))
+                        .filter((token) => !["BTC", "LINK", "ETH", "UNI", "MATIC", "COPx", "CGRi"].includes(token.symbol))
                         .map((token) => (
                         <option key={`tokenB-${token.address}`} value={token.symbol} style={{ background: "#121212" }}>
                           {token.symbol} ({token.name || token.chain})

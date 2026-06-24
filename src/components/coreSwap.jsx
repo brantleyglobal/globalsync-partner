@@ -359,7 +359,9 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
                     onChange={(e) => setTokenB(e.target.value)}
                 >
                     <option value="" disabled style={{ background: "#121212" }}>Select Asset B</option>
-                    {mergedTokens.map((token) => (
+                    {mergedTokens
+                    .filter((token) => !["BTC", "COPx", "CGRi"].includes(token.symbol))
+                    .map((token) => (
                     <option key={`tokenB-${token.address}`} value={token.address} style={{ background: "#121212" }}>
                         {token.symbol} ({token.name || token.chain})
                     </option>
@@ -413,7 +415,7 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
             {/* ROW 1: 2 Inputs */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", alignItems: "start" }}>
             <div>
-                <label style={styles.label}>XCHNAGE CONTRACT ADDRESS</label>
+                <label style={styles.label}>XCHANGE CONTRACT ADDRESS</label>
                 <input type="text" placeholder="0x..." style={styles.inputElement} value={targetSwapAddress} onChange={(e) => setTargetSwapAddress(e.target.value)} />
             </div>
             <div>
