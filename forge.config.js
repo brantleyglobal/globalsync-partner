@@ -39,6 +39,7 @@ module.exports = {
       config: {
         name: 'GlobalSync',
         setupIcon: './assets/logo.ico',
+        loadingGif: '',
       },
     },
     {
