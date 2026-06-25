@@ -5,10 +5,8 @@
     "output": "out"
   },
   "files": [
-    "dist/**/*",
+    "src/**/*",
     "assets/**/*",
-    "src/main.js",
-    "src/preload.js",
     "package.json"
   ],
   "publish": {
