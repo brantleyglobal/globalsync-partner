@@ -1,0 +1,41 @@
+{
+  "appId": "com.brantleyglobal.globalsync",
+  "productName": "GlobalSync",
+  "directories": {
+    "output": "out"
+  },
+  "files": [
+    "dist/**/*",
+    "assets/**/*",
+    "src/main.js",
+    "src/preload.js",
+    "package.json"
+  ],
+  "publish": {
+    "provider": "github",
+    "owner": "brantleyglobal",
+    "repo": "globalsync-partner",
+    "releaseType": "draft"
+  },
+  "win": {
+    "target": ["nsis"],
+    "icon": "assets/logo.ico"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "runAfterFinish": true
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "icon": "assets/logo.icns"
+  },
+  "linux": {
+    "target": ["deb", "rpm"],
+    "category": "Finance",
+    "icon": "assets/logo.png"
+  }
+}

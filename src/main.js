@@ -53,6 +53,7 @@ function createWindow() {
   if (process.platform === 'darwin') iconExtension = '.icns';
 
   const iconPath = path.join(__dirname, 'assets', `logo${iconExtension}`);
+  const splashImgPath = path.join(__dirname, 'assets', 'logo.png');
   
   // 1. CREATE A SLEEK, FRAMELESS SPLASH WINDOW
   const splash = new BrowserWindow({
@@ -62,7 +63,10 @@ function createWindow() {
     transparent: true,      // Allows transparent logos if your PNG has no background
     alwaysOnTop: true,      // Keeps it visible while the app boots up
     resizable: false,
-    icon: iconPath
+    icon: iconPath,
+    webPreferences: {
+      webSecurity: false
+    }
   });
 
   // Load a simple HTML string containing your image directly into the splash window
@@ -70,7 +74,7 @@ function createWindow() {
   splash.loadURL(`data:text/html;charset=utf-8,
     <html style="margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;">
       <body style="margin: 0; background: transparent; display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;">
-        <img src="file://${iconPath.replace(/\\/g, '/')}" style="width: 80%; height: auto; object-fit: contain;" />
+        <img src="file://${splashImgPath.replace(/\\/g, '/')}" style="width: 80%; height: auto; object-fit: contain;" />
       </body>
     </html>
   `);
@@ -85,7 +89,7 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
     }
   });
 
