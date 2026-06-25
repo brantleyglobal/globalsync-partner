@@ -13,7 +13,7 @@
     "provider": "github",
     "owner": "brantleyglobal",
     "repo": "globalsync-partner",
-    "releaseType": "draft"
+    "releaseType": "release"
   },
   "win": {
     "target": ["nsis"],
