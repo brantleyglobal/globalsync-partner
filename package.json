@@ -133,11 +133,12 @@
         "url": "git+https://github.com/brantleyglobal/globalsync-partner.git"
     },
     "keywords": [],
-    "author": "Brantley Global",
+    "author": "Brantley Global <global@brantleyglobal.com>",
     "license": "ISC",
     "bugs": {
         "url": "https://github.com/brantleyglobal/globalsync-partner/issues"
     },
     "homepage": "https://github.com/brantleyglobal/globalsync-partner#readme",
     "packageManager": "yarn@1.22.22"
+    
 }
