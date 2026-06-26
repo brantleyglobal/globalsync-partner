@@ -13,13 +13,13 @@
     "main": "src/main.js",
     "type": "commonjs",
     "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "preview": "vite preview",
-        "start": "electron src/main.js",
-        "package": "npm run build && electron-builder",
-        "make": "npm run build && electron-builder",
-        "publish": "npm run build && electron-builder --publish always"
+        "dev": "./node_modules/.bin/vite",
+        "build": "./node_modules/.bin/vite build",
+        "preview": "./node_modules/.bin/vite preview",
+        "start": "./node_modules/.bin/electron src/main.js",
+        "package": "yarn build && ./node_modules/.bin/electron-builder",
+        "make": "yarn build && ./node_modules/.bin/electron-builder",
+        "publish": "yarn build && ./node_modules/.bin/electron-builder --publish always"
     },
     "build": {
         "appId": "com.brantleyglobal.globalsync",
