@@ -5,6 +5,8 @@ process.on('uncaughtException', (error) => {
 });
 
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater'); // <-- Added
+let win; // <-- Moved out of createWindow() to the top-level scope
 
 // Catch unhandled async promise rejections
 process.on('unhandledRejection', (reason) => {
@@ -19,33 +21,6 @@ const deploymentsPath = path.join(__dirname, 'deployments.json');
 
 const supportedTokens = require(tokensPath);
 const deployments = require(deploymentsPath);
-const providers = {
-  ethereum: new ethers.JsonRpcProvider("https://1rpc.io/eth"),
-  polygon:  new ethers.JsonRpcProvider("https://polygon-rpc.com"),
-  globalChain:   new ethers.JsonRpcProvider("https://rpc.brantley-global.com"),
-}
-
-const CONTRACT_ABI = [
-  "function getDepositsInRange(uint256 startTs, uint256 endTs, bool process) public returns (bool)",
-  "function getWithdrawInRange(uint256 startTs, uint256 endTs, bool process) public returns (bool)",
-  "function getUserTermCount(address user) external view returns (uint256)",
-  "function getUserDepositCount(address user) external view returns (uint256)",
-  "function getWithdrawalUser(address user, uint256 index) external view returns (tuple(address user, uint256 index) memory)",
-  "function getDepositUser(address user, uint256 index) external view returns (tuple(address user, uint256 index) memory)",
-  "function purchase(address buyer, address stable, uint256 productId, uint256 amount, uint256 shipping, uint256 customizations, bytes32 configs, uint256 quantity, uint256 rate, address affiliate, uint256 commission, uint256 region, bytes32 depositHash, uint256 purchaseTimeStamp) external",
-  "function acquisition(address user, address token, uint256 amountin, uint256 amountout, uint256 rate, uint256 currentTxTime, bytes32 depositHash) external nonReentrant",
-  "function liquidate(address payoutToken, uint256 amount, uint256 timeStamp) external",
-  "function deposit(uint256 timeStamp, address investor, address token, uint256 amount, uint256 committedQuarters, uint256 incomingRate, bytes32 depositHash) external payable",
-  "function deposit(uint256 timeStamp, address user, address token, address venture, uint256 amount, uint256 incomingRate, bytes32 depositHash) external payable",
-  "function withdraw(address dividendTokenOrVenture, address payToken, uint256 holderBalance, uint256 timeStamp) external payable"
-];
-
-const decimalsCache = {};
-const ERC20_MINIMAL_ABI = [
-  "function decimals() view returns (uint8)",
-  "function symbol() view returns (string)",
-  "event Transfer(address indexed from, address indexed to, uint256 value)"
-];
 
 function createWindow() {
   let iconExtension = '.png';
@@ -96,9 +71,14 @@ function createWindow() {
   // 3. THE SWAP: When the main page is ready, kill the splash and show the app
   win.once('ready-to-show', () => {
     setTimeout(() => {
-      splash.destroy(); // Closes the logo window safely
-      win.show();       // Opens your app layout seamlessly
-    }, 800); // Optional 800ms fade/hold cushion so the logo doesn't disappear too fast
+      splash.destroy();
+      win.show();
+      
+      // <-- Added: Check for updates silently once the UI is visible
+      if (app.isPackaged) {
+        autoUpdater.checkForUpdatesAndNotify();
+      }
+    }, 800);
   });
 
   // --- Keep all your existing navigation handlers exactly as they are ---
@@ -190,6 +170,12 @@ app.whenReady().then(() => {
       label: 'Help',
       submenu: [
         {
+          label: 'Check for Updates...',
+          click: () => {
+            autoUpdater.checkForUpdatesAndNotify();
+          }
+        },
+        {
           label: 'Visit Dashboard Website',
           click: async () => {
             // Now this command will actually fire completely unimpeded!
@@ -216,7 +202,7 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
-});
+}); 
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -224,15 +210,25 @@ app.on('window-all-closed', () => {
   }
 });
 
-/// ==========================================
-// LOGIC & IPC INTERCEPTOR
 // ==========================================
+// AUTO UPDATER EVENTS
+// ==========================================
+autoUpdater.on('update-downloaded', (info) => {
+  dialog.showMessageBox(win, {
+    type: 'info',
+    title: 'Update Available',
+    message: `A new version (${info.version}) has been downloaded. Restart the application to apply the update?`,
+    buttons: ['Restart', 'Later']
+  }).then((result) => {
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall(); // Installs and reboots app
+    }
+  });
+});
 
-// Your helper function from the original snippet
-function toISO(y, m, d, isEnd = false) {
-  if (!y || !m || !d) return "";
-  return isEnd ? `${y}-${m}-${d}T23:59:59.999Z` : `${y}-${m}-${d}T00:00:00.000Z`;
-}
+autoUpdater.on('error', (err) => {
+  console.error('Updater error:', err);
+});
 
 // ========================================================
 // EMAIL HANDLER
@@ -248,6 +244,34 @@ function sanitizeBigInts(obj) {
   }
   return obj;
 }
+
+const providers = {
+  ethereum: new ethers.JsonRpcProvider("https://1rpc.io/eth"),
+  polygon:  new ethers.JsonRpcProvider("https://polygon-rpc.com"),
+  globalChain:   new ethers.JsonRpcProvider("https://rpc.brantley-global.com"),
+}
+
+const CONTRACT_ABI = [
+  "function getDepositsInRange(uint256 startTs, uint256 endTs, bool process) public returns (bool)",
+  "function getWithdrawInRange(uint256 startTs, uint256 endTs, bool process) public returns (bool)",
+  "function getUserTermCount(address user) external view returns (uint256)",
+  "function getUserDepositCount(address user) external view returns (uint256)",
+  "function getWithdrawalUser(address user, uint256 index) external view returns (tuple(address user, uint256 index) memory)",
+  "function getDepositUser(address user, uint256 index) external view returns (tuple(address user, uint256 index) memory)",
+  "function purchase(address buyer, address stable, uint256 productId, uint256 amount, uint256 shipping, uint256 customizations, bytes32 configs, uint256 quantity, uint256 rate, address affiliate, uint256 commission, uint256 region, bytes32 depositHash, uint256 purchaseTimeStamp) external",
+  "function acquisition(address user, address token, uint256 amountin, uint256 amountout, uint256 rate, uint256 currentTxTime, bytes32 depositHash) external nonReentrant",
+  "function liquidate(address payoutToken, uint256 amount, uint256 timeStamp) external",
+  "function deposit(uint256 timeStamp, address investor, address token, uint256 amount, uint256 committedQuarters, uint256 incomingRate, bytes32 depositHash) external payable",
+  "function deposit(uint256 timeStamp, address user, address token, address venture, uint256 amount, uint256 incomingRate, bytes32 depositHash) external payable",
+  "function withdraw(address dividendTokenOrVenture, address payToken, uint256 holderBalance, uint256 timeStamp) external payable"
+];
+
+const decimalsCache = {};
+const ERC20_MINIMAL_ABI = [
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
+  "event Transfer(address indexed from, address indexed to, uint256 value)"
+];
 
 ipcMain.handle('send-smtp-email', async (event, emailPayload) => {
   const payload = {
@@ -1470,6 +1494,9 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
   }
 });
 
+// ========================================================
+// XCHANGE HANDLER
+// ========================================================
 
 ipcMain.handle('query-swap-registry', async (event, payload) => {
   // Destructure the payload sent from the UI dropdown matrix
