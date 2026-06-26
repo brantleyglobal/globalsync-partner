@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { genData } from "./utils/genData";
 import { getExchangeRates } from "./utils/exchangeRates";
@@ -16,6 +16,7 @@ import AffiliatePortal from "./components/coreAffiliate.jsx";
 import GlobalSwapPortal from "./components/coreSwap.jsx";
 import NativeExchangeHistory from "./components/coreNative.jsx";
 import Sidebar from './components/sideBar';
+import { useRpcStatus } from "./utils/statusRpc";
 import { styles } from './utils/styles.jsx';
 import './global.css';
 
@@ -26,7 +27,9 @@ export default function AdminDashboard() {
   // -----------------------------
 
   // Add this state alongside your showAuthDrawer and isOpen states
-  const [portalView, setPortalView] = useState('admin'); // Defaulting to your current view
+  const [portalView, setPortalView] = useState('hub'); // Defaulting to your current view
+  const [loading, setLoading] = useState(false);
+  const rpcUp = useRpcStatus();
   
   const [showAuthDrawer, setShowAuthDrawer] = useState(false);
 
@@ -54,6 +57,14 @@ export default function AdminDashboard() {
   const [exchangeRate, setExchangeRate] = useState("");
   const [convertedAmount, setConvertedAmount] = useState("");
 
+  const [quatity, setSelectedQuantity] = useState(Number);
+  const [firstname, setFirstname] = useState("");
+  const [lastname, setLastname] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [address, setAddress] = useState("");
+
   const [selectedStableTokenSymbol, setSelectedStableTokenSymbol] = useState(""); // e.g., "LGE20KVA"
   const [selectedAssetKey, setSelectedAssetKey] = useState(""); // e.g., "LGE20KVA"
   const [selectedPanelKey, setSelectedPanelKey] = useState(""); // e.g., "standard" or "customized"
@@ -61,10 +72,10 @@ export default function AdminDashboard() {
   const [selectedMonitoringKey, setSelectedMonitoringKey] = useState("");
   const [selectedCountryKey, setSelectedCountryKey] = useState("");
 
-  const [selectedVoltage, setSelectedVoltage] = useState("");       // Fixed line 818 crash
-  const [selectedFrequency, setSelectedFrequency] = useState("");   // Used in hardwareConfigBytes32
-  const [selectedPhase, setSelectedPhase] = useState("");           // Used in hardwareConfigBytes32
-  const [selectedReactor, setSelectedReactor] = useState("");       // Used in hardwareConfigBytes32
+  const [selectedVoltage, setSelectedVoltage] = useState("");
+  const [selectedFrequency, setSelectedFrequency] = useState("");
+  const [selectedPhase, setSelectedPhase] = useState("");
+  const [selectedReactor, setSelectedReactor] = useState("");
   
   // Token Metadata Context hooks for payment capturing
   const [selectedTokenAddress, setSelectedTokenAddress] = useState(""); 
@@ -75,6 +86,50 @@ export default function AdminDashboard() {
   const [purchaseTxHash, setPurchaseTxHash] = useState("");
   const [shippingDays, setShippingDays] = useState(90);
   
+  const [currentView, setCurrentView] = useState('hub');
+  // This forces React to look at the browser's storage on refresh before defaulting to null
+  const [lastVisitedMatrix, setLastVisitedMatrix] = useState(() => {
+    return localStorage.getItem('last_visited_matrix') || null;
+  });
+
+  const [recentlyViewed, setRecentlyViewed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('recently_viewed');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Ensure the parsed item is strictly a standard Array
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (error) {
+      console.error("Failed parsing recently_viewed storage data:", error);
+    }
+    return []; // Fallback to an empty array safely
+  });
+    
+  const matrixNames = {
+    investments: "Investor Matrix",
+    wholesale: "Wholesaler Matrix",
+    affiliate: "Affiliate Matrix",
+    swap: "Global Gateway Matrix",
+    gateway: "XChange Dashboard",
+    admin: "Administrative Dashboard"
+  };
+
+  const navigateToMatrix = (matrixKey) => {
+    setPortalView(matrixKey);
+    setLastVisitedMatrix(matrixKey);
+    
+    setRecentlyViewed((prev) => {
+      // Filter out the key if it already exists to avoid duplicates, then move it to the front
+      const filtered = prev.filter(item => item !== matrixKey);
+      return [matrixKey, ...filtered].slice(0, 3); // Keeps the top 3 most recent
+    });
+  };
+  
+  const [wholesaleTotal, setWholesaleTotal] = useState("");
+  const [onTotalChange, setOnTotalChange] = useState("");
+  const [portfolioTotal, setPortfolioTotal] = useState("0.00 GBDo");
+  const [affiliateTotal, setAffiliateTotal] = useState("");
   const { balances } = useDirectTokenBalances(userAddress);
 
   const getUnixTimestamp = (dateStr, isEndOfDay = false) => {
@@ -455,6 +510,7 @@ export default function AdminDashboard() {
       basePrice: basePrice.toString(),
       customizationUpcharges: totalUpcharges.toString(),
       shippingTransitDays: shippingDays.toString(),
+      quantity: quantity,
       totalBaseDays: assetData.baseDays || 90,
       exchangeRate: activeExchangeRateBigInt.toString(),
       hardwareConfigBytes32: packedConfigBytes32,
@@ -464,13 +520,55 @@ export default function AdminDashboard() {
       cryptoAuth: credentialsPayload 
     };
 
+    let liveTransactionHash = "";
+
     try {
       console.log("Broadcasting multi-step coordinated execution payload to Electron backend...", payload);
+      
       const response = await window.api.triggerVault(payload);
       setUserQueryResults(Array.isArray(response) ? response : [response]);
+      
+      // Extract the live hash out of the success payload object
+      if (response && response.status === "Success" && response.data) {
+        liveTransactionHash = response.data;
+        console.log("Captured live blockchain transaction hash:", liveTransactionHash);
+      }
+
       alert("Transaction written and processed successfully!");
     } catch (error) {
       console.error("Coordinated IPC execution failed:", error);
+    }
+
+    const totalTokenAmount = (basePrice + totalUpcharges).toString();
+    let affiliateAddress = 0x0000000000000000000000000000000000000000;
+    if (userAddress != buyerWalletAddress) {
+      affiliateAddress = userAddress;
+    }
+
+    const result = await window.electron.sendEmail({
+      firstname,
+      lastname,
+      email,
+      tx: trackedDepositHash,
+      checkoutAsset: assetData.assetId,
+      quantity,
+      totalTokenAmount,
+      userAddress: buyerWalletAddresss,
+      tokenSymbol: selectedTokenSymbol,
+      configuration: configurationSummary,
+      address,
+      phone,
+      country: selectedCountryKey,
+      promo: 0x0000000000000000000000000000000000000000,
+      postalCode,
+      receipt: liveTransactionHash,
+      purchaseMadeEvents: "",
+    });
+
+    if (result.success) {
+      console.log("Email notification sent.");
+    } else {
+      console.error("Failed to send email notification:", result.error);
     }
   };
 
@@ -544,6 +642,43 @@ export default function AdminDashboard() {
     }
   };
 
+  // FIRST, define the hook block so the browser knows what it is
+  const useRpcLatency = (rpcUrl, intervalMs = 5000) => {
+    const [latency, setLatency] = useState(0);
+
+    useEffect(() => {
+      if (!rpcUrl) return;
+
+      const checkLatency = async () => {
+        const startTime = performance.now();
+        
+        try {
+          await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 1 }),
+          });
+          
+          const endTime = performance.now();
+          setLatency(Math.round(endTime - startTime));
+        } catch (error) {
+          console.error("RPC Latency check failed", error);
+          setLatency(-1);
+        }
+      };
+
+      checkLatency();
+      const interval = setInterval(checkLatency, intervalMs);
+
+      return () => clearInterval(interval);
+    }, [rpcUrl, intervalMs]);
+
+    return latency;
+  };
+
+  // 2. SECOND, call the hook using your endpoint configuration
+  const latency = useRpcLatency("https://rpc.brantley-global.com");
+
   return (
   <div style={styles.appContainer}>
 
@@ -551,10 +686,11 @@ export default function AdminDashboard() {
     <Sidebar 
       portalView={portalView} 
       setPortalView={setPortalView}
+      setLastVisitedMatrix={setLastVisitedMatrix}
+      setRecentlyViewed={setRecentlyViewed}
       userAddress={userAddress}
       setUserAddress={setUserAddress}
       balances={balances}
-      // ADD THESE DEFINITIVE DRIVER PROPS HERE:
       authMethod={authMethod}
       setAuthMethod={setAuthMethod}
       privateKey={privateKey}
@@ -586,13 +722,208 @@ export default function AdminDashboard() {
     />
 
     {/* DYNAMIC WORKSPACE PORTAL CONTAINER */}
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto" }}>
-      
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", background: "#050505" }}>
+
+      {/* MASTER DEFAULT LANDING: SYSTEM OPERATIONS HUB */}
+      {(!portalView || portalView === 'hub') && (
+        <div style={{ padding: "48px 64px", maxWidth: "1400px", width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+          
+          {/* HEADER LAYER: Minimalist Typography */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid #111", paddingBottom: "16px", marginBottom: "40px" }}>
+            <div>
+              <h1 style={{ ...styles.label, color: "#ffffff", fontSize: "20px", fontWeight: "300", letterSpacing: "1px", margin: "0 0 4px 0" }}>GLOBAL PARTNER HUB</h1>
+              <p style={{ color: "#555", fontSize: "11px", letterSpacing: "0.5px", margin: 0 }}>
+                SYSTEM RUNTIME & OPERATIONAL MATRIX
+              </p>
+            </div>
+            
+            {/* STATUS BAR */}
+            <div style={{ ...styles.label, display: "flex", gap: "24px", fontSize: "11px", letterSpacing: "0.5px" }}>
+              <div>
+                <span style={{ color: "#444" }}>NETWORK: </span>
+                <span style={{ color: rpcUp && latency > 0 ? "#1c9c31bd" : "#ef4444" }}>
+                  {rpcUp && latency > 0 ? "ONLINE" : "OFFLINE"}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: "#444" }}>STATUS: </span>
+                {isConnected ? (
+                  <span style={{ color: "#1c9c31bd", fontWeight: "500" }}>CONNECTED</span>
+                ) : (
+                  <span style={{ color: "#ef4444", fontWeight: "500" }}>DISCONNECTED</span>
+                )}
+              </div>
+              <div>
+              <span style={{ color: "#444" }}>ACTIVE WALLET: </span>
+              <span style={{ color: isConnected && userAddress ? "#fff" : "#555" }}>
+                {isConnected && userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`.toUpperCase() : "0XNONE"}
+              </span>
+            </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", width: "100%", margin: "0 0 20px 0" }}>
+            <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
+          </div>
+
+          {/* THREE-COLUMN BENTO GRID */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px", background: "#111", border: "1px solid #83828217", borderRadius: "4px", overflow: "hidden" }}>
+            
+            {/* TOP UTILITY 1: RESUME */}
+            <div style={{ background: "#090909", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "120px" }}>
+              <div>
+                <span style={{ color: "#8d8d8d", fontSize: "10px", letterSpacing: "1px" }}>RESUME SESSION</span>
+                <p style={{ ...styles.label, color: lastVisitedMatrix ? "#fff" : "#444", fontSize: "13px", margin: "8px 0 0 0" }}>
+                  {lastVisitedMatrix ? matrixNames[lastVisitedMatrix] : "No recent activity log."}
+                </p>
+              </div>
+              {lastVisitedMatrix ? (
+                <button 
+                  onClick={() => setPortalView(lastVisitedMatrix)}
+                  style={{ 
+                    ...styles.btnForestGreen,
+                    background: "rgba(13, 61, 20, 0.26)",
+                    color: "#fff", 
+                    border: "1px solid rgba(119, 119, 119, 0.15)",
+                    borderRadius: "4px",
+                    padding: "6px 12px",
+                    fontSize: "10px",
+                    letterSpacing: "0.5px",
+                    cursor: "pointer",
+                    textAlign: "center",
+                    marginTop: "16px",
+                    width: "fit-content",
+                    transition: "background 0.2s ease"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"}
+                  onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"}
+                >
+                  BACK TO BUSINESS
+                </button>
+              ) : (
+                <div style={{ height: "27px", marginTop: "16px" }} />
+              )}
+            </div>
+
+            {/* TOP UTILITY 2: LOGS */}
+            <div style={{ background: "#090909", padding: "24px", minHeight: "120px" }}>
+              <span style={{ color: "#8d8d8d", fontSize: "10px", letterSpacing: "1px" }}>HISTORICAL USAGE</span>
+              <div style={{ marginTop: "12px", fontSize: "11px", color: "#888", display: "flex", flexDirection: "column", gap: "4px" }}>
+                
+                {/* Safe defensive check before mapping */}
+                {Array.isArray(recentlyViewed) && recentlyViewed.slice(0, 2).map((matrixKey) => (
+                  <div key={matrixKey}>
+                    • {matrixNames?.[matrixKey]?.split(':')[0] || matrixKey.toUpperCase()}
+                  </div>
+                ))}
+                
+                {(!recentlyViewed || !Array.isArray(recentlyViewed) || recentlyViewed.length === 0) && (
+                  <div style={{ color: "#333" }}>Logs empty.</div>
+                )}
+                
+              </div>
+            </div>
+
+            {/* TOP UTILITY 3: TELEMETRY */}
+            <div style={{ background: "#090909", padding: "24px", minHeight: "120px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div>
+                <span style={{ color: "#8d8d8d", fontSize: "10px", letterSpacing: "1px" }}>NETWORK LATENCY</span>
+                <p style={{ ...styles.label, color: "#fff", fontSize: "16px", margin: "8px 0 0 0" }}>
+                  {latency > 0 ? `${latency} ms` : "0 ms"}
+                </p>
+              </div>
+              <span style={{ color: "#8d8d8d", fontSize: "10px" }}>
+                NODE STABILITY: {' '}
+                {latency === 0 ? (
+                  <span style={{ color: "#555" }}>OFFLINE</span>
+                ) : latency < 100 ? (
+                  <span style={{ color: "#22c55e" }}>OPTIMAL</span>
+                ) : latency <= 250 ? (
+                  <span style={{ color: "#eab308" }}>STABLE</span>
+                ) : (
+                  <span style={{ color: "#ef4444" }}>DEGRADED</span>
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* DIVIDER 1: THE SYSTEM PARTITION */}
+          {/* Separates transient hardware status widgets from primary functional architecture */}
+          <div style={{ display: "flex", alignItems: "center", margin: "48px 0 32px 0" }}>
+            <span style={{ ...styles.label, color: "#696868", fontSize: "10px", letterSpacing: "2px", fontWeight: "600", paddingRight: "24px" }}>CORE SYSTEM MATRICES</span>
+            <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, #888787 0%, #111 80%, transparent 100%)" }} />
+          </div>
+
+          {/* CORE MATRIX INTERFACES GRID */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+            
+            {[
+              { id: 'admin', title: 'Administrative Dashboard', desc: 'Settlements, system audits, and deposits.', label: 'CORE_ENGINE', val: 'SECURE' },
+              { id: 'wholesale', title: 'Wholesaler Matrix', desc: 'Track inventory purchases and corporate credits.', label: 'CUMULATIVE_VOLUME', val: !isConnected && wholesaleTotal ? `$${wholesaleTotal}` : "0" },
+              { id: 'investments', title: 'Investor Matrix', desc: 'Portfolio view and execution dashboard.', label: 'OUTSTANDING', val: !isConnected && portfolioTotal ? portfolioTotal : "0.00 GBDo"},
+              { id: 'gateway', title: 'Global Dollar Gateway', desc: 'Liquidity flow configurations and exchanges.', label: 'GATEWAY_ROUTER', val: 'ACTIVE' },
+              { id: 'swap', title: 'Global XChange Matrix', desc: 'Escrowed swap executions and counterparties.', label: 'ESCROW_SYSTEM', val: 'STABLE' },
+              { id: 'affiliate', title: 'Affiliate Matrix', desc: 'Performance analytics and distribution loops.', label: 'COMMISSIONS', val: `${(!isConnected && affiliateTotal) ? `$${String(affiliateTotal).trim()}` : "0.00"} GBDo` }
+            ].map((m) => (
+              <div 
+                key={m.id}
+                onClick={() => navigateToMatrix(m.id)}
+                style={{ 
+                  background: "#090909",
+                  border: "1px solid #111",
+                  padding: "24px",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#222";
+                  e.currentTarget.style.background = "#0d0d0d";
+                  // Instantly target the card's internal vertical divider lines on hover
+                  const line = e.currentTarget.querySelector('.card-split-line');
+                  if (line) line.style.background = '#222';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#111";
+                  e.currentTarget.style.background = "#090909";
+                  const line = e.currentTarget.querySelector('.card-split-line');
+                  if (line) line.style.background = '#111';
+                }}
+              >
+                <div>
+                  <h3 style={{ ...styles.label, color: "#fff", fontSize: "14px", fontWeight: "400", margin: "0 0 4px 0" }}>{m.title}</h3>
+                  <p style={{ ...styles.label, color: "#666", fontSize: "11px", margin: 0, maxWidth: "340px" }}>{m.desc}</p>
+                </div>
+                
+                {/* THE DATA COLUMN SPLITTER */}
+                {/* Creates an elegant visual alignment channel before structural metrics data blocks */}
+                <div style={{ display: "flex", alignItems: "center", height: "32px", gap: "24px" }}>
+                  <div 
+                    className="card-split-line" 
+                    style={{ width: "1px", height: "100%", background: "#111", transition: "background 0.3s" }} 
+                  />
+                  <div style={{ textAlign: "right", minWidth: "100px" }}>
+                    <div style={{ ...styles.label, color: "#444", fontSize: "9px", letterSpacing: "0.5px" }}>{m.label}</div>
+                    <div style={{ ...styles.label, color: "#fff", fontSize: "12px", marginTop: "2px" }}>{m.val}</div>
+                  </div>
+                </div>
+
+              </div>
+            ))}
+
+          </div>
+
+        </div>
+      )}    
       {/* VIEW 1: INVESTMENTS PANEL */}
       {portalView === 'investments' && (
         <CorePortfolioMatrix 
           userAddress={userAddress}
           balances={balances}
+          onTotalChange={setPortfolioTotal}
           isConnected={isConnected}
         />
       )}
@@ -602,6 +933,50 @@ export default function AdminDashboard() {
         <PartnerPortal 
           userAddress={userAddress} 
           activeContract={selectedContract}
+          cumalativeChange={setWholesaleTotal}
+          selectedAssetKey={selectedAssetKey}
+          setSelectedAssetKey={setSelectedAssetKey}
+          selectedPanelKey={selectedPanelKey}
+          setSelectedPanelKey={setSelectedPanelKey}
+          selectedGridTieKey={selectedGridTieKey}
+          setSelectedGridTieKey={setSelectedGridTieKey}
+          selectedMonitoringKey={selectedMonitoringKey}
+          setSelectedMonitoringKey={setSelectedMonitoringKey}
+          selectedCountryKey={selectedCountryKey}
+          setSelectedCountryKey={setSelectedCountryKey}
+          selectedStableTokenSymbol={selectedStableTokenSymbol}
+          setSelectedStableTokenSymbol={setSelectedStableTokenSymbol}
+          supportedTokens={supportedTokens}
+          setSelectedTokenAddress={setSelectedTokenAddress}
+          setSelectedTokenDecimals={setSelectedTokenDecimals}
+          setSelectedTokenChain={setSelectedTokenChain}
+          purchaseTxHash={purchaseTxHash}
+          setPurchaseTxHash={setPurchaseTxHash}
+          buyerWalletAddress={buyerWalletAddress}
+          setBuyerWalletAddress={setBuyerWalletAddress}
+          genData={genData}
+          selectedVoltage={selectedVoltage}
+          setSelectedVoltage={setSelectedVoltage}
+          selectedFrequency={selectedFrequency}
+          setSelectedFrequency={setSelectedFrequency}
+          selectedPhase={selectedPhase}
+          setSelectedPhase={setSelectedPhase}
+          selectedReactor={selectedReactor}
+          setSelectedReactor={setSelectedReactor}
+          quuantity={setSelectedQuantity}
+          firstname={firstname}
+          setFirstname={setFirstname}
+          lastname={lastname}
+          setLastname={setLastname}
+          email={email}
+          setEmail={setEmail}
+          phone={phone}
+          setPhone={setPhone}
+          postalCode={postalCode}
+          setPostalCode={setPostalCode}
+          address={address}
+          setAddress={setAddress}
+          handlePurchase={handlePurchase}
           isConnected={isConnected} 
         />
       )}
@@ -611,6 +986,7 @@ export default function AdminDashboard() {
         <AffiliatePortal
           userAddress={userAddress}
           activeContract={selectedContract}
+          affiliateTotal={affiliateTotal}
           isConnected={isConnected}
         />
       )}
@@ -656,36 +1032,6 @@ export default function AdminDashboard() {
           setWalletAddress={setWalletAddress}
           handleUserQuery={handleUserQuery}
           userQueryResults={userQueryResults}
-          selectedAssetKey={selectedAssetKey}
-          setSelectedAssetKey={setSelectedAssetKey}
-          selectedPanelKey={selectedPanelKey}
-          setSelectedPanelKey={setSelectedPanelKey}
-          selectedGridTieKey={selectedGridTieKey}
-          setSelectedGridTieKey={setSelectedGridTieKey}
-          selectedMonitoringKey={selectedMonitoringKey}
-          setSelectedMonitoringKey={setSelectedMonitoringKey}
-          selectedCountryKey={selectedCountryKey}
-          setSelectedCountryKey={setSelectedCountryKey}
-          selectedStableTokenSymbol={selectedStableTokenSymbol}
-          setSelectedStableTokenSymbol={setSelectedStableTokenSymbol}
-          supportedTokens={supportedTokens}
-          setSelectedTokenAddress={setSelectedTokenAddress}
-          setSelectedTokenDecimals={setSelectedTokenDecimals}
-          setSelectedTokenChain={setSelectedTokenChain}
-          purchaseTxHash={purchaseTxHash}
-          setPurchaseTxHash={setPurchaseTxHash}
-          buyerWalletAddress={buyerWalletAddress}
-          setBuyerWalletAddress={setBuyerWalletAddress}
-          genData={genData}
-          selectedVoltage={selectedVoltage}
-          setSelectedVoltage={setSelectedVoltage}
-          selectedFrequency={selectedFrequency}
-          setSelectedFrequency={setSelectedFrequency}
-          selectedPhase={selectedPhase}
-          setSelectedPhase={setSelectedPhase}
-          selectedReactor={selectedReactor}
-          setSelectedReactor={setSelectedReactor}
-          handlePurchase={handlePurchase}
           transactionHash={transactionHash}
           setTransactionHash={setTransactionHash}
           custodialWallet={custodialWallet}

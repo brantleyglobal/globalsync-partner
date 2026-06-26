@@ -1,6 +1,7 @@
 // src/styles.jsx
 
 export const styles = {
+  // GLOBAL LAYOUT CONFIGURATIONS
   appContainer: {
     display: "flex",
     minHeight: "100vh",
@@ -19,7 +20,7 @@ export const styles = {
     boxSizing: "border-box",
     height: "100vh",
     overflowY: "auto",
-    scrollbarGutter: "stable", /* From our scroll fix */
+    scrollbarGutter: "stable",
   },
   brandContainer: {
     marginBottom: "20px",
@@ -27,7 +28,7 @@ export const styles = {
     alignItems: "center",
     gap: "12px",
     padding: "12px 8px",
-    flexShrink: 0, /* From our layout squeeze fix */
+    flexShrink: 0,
   },
   title: {
     fontSize: "20px",
@@ -94,26 +95,36 @@ export const styles = {
     cursor: "pointer",
   },
   
-  /* MAIN CONTENT & LEDGER PANELS */
+  // MAIN WORKSPACE & PORTALS
   mainContent: {
     flex: 1,
     padding: "40px",
     paddingTop: "10px",
     overflowY: "auto",
     boxSizing: "border-box",
-    height: "100vh"
+    height: "100vh",
+    background: "#020202"
   },
+  hubWrapper: {
+    width: '100%',
+    boxSizing: 'border-box'
+  },
+
+  // THE THREE-COLUMN BENTO GRID SYSTEM
   gridContainer: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "30px",
-    alignItems: "start",
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', 
+    gap: '24px',
+    marginTop: '24px',
+    alignItems: 'start'
   },
   columnGroup: {
     display: "flex",
     flexDirection: "column",
     gap: "30px",
   },
+
+  // UNIFIED CORE CARD SURFACES (Industrial Theme Preserved)
   sectionCard: {
     background: "#0c0c0c",
     border: "1px solid #161616",
@@ -121,17 +132,72 @@ export const styles = {
     padding: "28px",
     boxSizing: "border-box",
   },
+  cardBase: {
+    padding: '24px',
+    backgroundColor: '#0c0c0c', 
+    border: '1px solid #161616', 
+    borderRadius: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    boxSizing: 'border-box',
+    gap: '16px'
+  },
+  
+  // THE ASYMMETRIC GRID MULTIPLIER
+  cardSpan2: {
+    gridColumn: 'span 2 / span 2', 
+  },
+  resumeCard: {
+    background: 'linear-gradient(to bottom right, #01290c30, #0c0c0c)', 
+    border: '1px solid rgba(1, 41, 12, 0.4)',
+  },
+
+  // INDUSTRIAL TYPOGRAPHY & INTERACTIVE DATA
   sectionTitle: {
     fontSize: "14px",
     fontWeight: "200",
     letterSpacing: "1px",
     margin: "0 0 24px 0",
     color: "#ffffff",
-    //borderBottom: "1px solid #161616",
     paddingBottom: "8px",
     textTransform: "uppercase",
-    marginBottom: "0px"
   },
+  cardTitle: {
+    color: '#ffffff',
+    fontSize: '13px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    margin: '0 0 4px 0',
+  },
+  cardSubtitle: {
+    color: '#ffffff8e',
+    fontSize: '12px',
+    lineHeight: '1.5',
+    margin: '0',
+  },
+  cardMetric: {
+    fontSize: '22px',
+    fontWeight: 600,
+    color: '#ffffff',
+    fontFamily: 'Courier New, Courier, monospace', 
+    letterSpacing: '-0.02em',
+  },
+  badge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    fontSize: '11px',
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    backgroundColor: '#0a0a0a', 
+    color: '#34d399',
+    border: '1px solid #111111'
+  },
+
+  // FORM CONTROLLERS & DATA ENTRIES
   formRow: {
     display: "flex",
     gap: "16px",
@@ -144,8 +210,9 @@ export const styles = {
   },
   label: {
     fontSize: "10px",
-    fontWeight: "200",
+    fontWeight: "600",
     color: "#666666",
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     letterSpacing: "1px",
     marginBottom: "6px",
     marginTop: "8px"
@@ -154,9 +221,10 @@ export const styles = {
     background: "#121212",
     border: "1px solid #222222",
     borderRadius: "6px",
-    color: "#ffffff",
+    color: "#ffffff8e",
     padding: "8px",
     fontSize: "13px",
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     marginBottom: "16px",
     width: "100%",
     boxSizing: "border-box",
@@ -197,37 +265,37 @@ export const styles = {
 };
 
 export const modalStyles = {
-    overlay: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.75)", // Dim backend background
-        backdropFilter: "blur(4px)",            // Soft blur effect
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,                           // Keep on top of page content
-        padding: "20px"
-    },
-    content: {
-        backgroundColor: "#1c1c1c",            // Matches a typical dark theme card surface
-        borderRadius: "8px",
-        width: "100%",
-        maxWidth: "900px",                      // Gives ample space for side-by-side structures
-        boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
-        position: "relative",
-        maxHeight: "90vh",
-        overflowY: "auto"                       // Ensures scrollability if viewing window shrinks
-    },
-    closeButton: {
-        background: "none",
-        border: "none",
-        color: "#888",
-        fontSize: "20px",
-        cursor: "pointer",
-        padding: "4px 8px",
-        transition: "color 0.2s"
-    }
-  };
+  overlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.75)", 
+    backdropFilter: "blur(4px)",            
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,                           
+    padding: "20px"
+  },
+  content: {
+    backgroundColor: "#1c1c1c",            
+    borderRadius: "8px",
+    width: "100%",
+    maxWidth: "900px",                     
+    boxShadow: "0 12px 40px rgba(0, 0, 0, 0.5)",
+    position: "relative",
+    maxHeight: "90vh",
+    overflowY: "auto"                       
+  },
+  closeButton: {
+    background: "none",
+    border: "none",
+    color: "#888",
+    fontSize: "20px",
+    cursor: "pointer",
+    padding: "4px 8px",
+    transition: "color 0.2s"
+  }
+};

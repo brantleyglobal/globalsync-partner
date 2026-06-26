@@ -1,8 +1,11 @@
 // src/components/coreNative.jsx
 import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
+import { useRpcStatus } from "../utils/statusRpc";
 
 export default function NativeExchangeHistory({ userAddress, isConnected }) {
+
+  const rpcUp = useRpcStatus();
   const [exchangeRecords, setExchangeRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -104,78 +107,74 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
 
   return (
     <div style={styles.mainContent}>
-      {/* GLOBAL SESSION STATUS BAR */} 
-      <div style={{ paddingTop: "0px", marginBottom: "6px", borderBottom: "1px solid #161616", paddingBottom: "6px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "16px" }}>
+      {/* GLOBAL SESSION STATUS BAR */}
+      <div style={{ display: "flex", flexDirection: "column", width: "100%", boxSizing: "border-box" }}>
+        
+        {/* HEADER LAYER: Matched perfectly to the premium blueprint layout */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", paddingBottom: "16px", marginBottom: "20px" }}>
           
+          {/* Left Side: Clean Title */}
           <div>
-            <p style={{ ...styles.subtitle, margin: 0, padding: "4px 0px" }}>
-              ACCOUNT STATUS: {isConnected ? (
-                <span style={{ fontFamily: "monospace", color: "#1d5c34", fontWeight: "600" }}>CONNECTED</span>
-              ) : (
-                <span style={{ color: "#ef4444", fontWeight: "600" }}>DISCONNECTED</span>
-              )}
+            <h1 style={{ ...styles.label, color: "#ffffff", fontSize: "20px", fontWeight: "300", letterSpacing: "1px", margin: "0" }}>
+              EXCHANGE HISTORY
+            </h1>
+            <p style={{ color: "#555", fontSize: "11px", letterSpacing: "0.5px", margin: 0 }}>
+              REVIEW PAST GLOBAL DOLLAR PURCHASES & HISTORICAL EXCHANGE RECORDS
             </p>
           </div>
           
-          <div style={{ display: "flex", alignItems: "center", fontSize: "13px" }}>
-            <span style={{ color: "#888", marginRight: "8px", fontSize: "11px", letterSpacing: "0.5px", fontWeight: "600" }}>ACTIVE WALLET:</span>
-            <code style={{ 
-                background: "#0a0a0a", 
-                padding: "4px 4px", 
-                borderRadius: "4px", 
-                color: userAddress ? "#1d5c34" : "#555",
-                fontFamily: "monospace",
-                border: "1px solid #111"
-            }}>
-              {isConnected && userAddress 
-                ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` 
-                : "0xNone"}
-            </code>
+          {/* Right Side: Consolidated Status Bar with Wallet Telemetry */}
+          <div style={{ ...styles.label, display: "flex", gap: "24px", fontSize: "11px", letterSpacing: "0.5px" }}>
+            <div>
+              <span style={{ color: "#444" }}>NETWORK: </span>
+              <span style={{ color: rpcUp > 0 ? "#1c9c31bd" : "#ef4444" }}>
+                {rpcUp > 0 ? "ONLINE" : "OFFLINE"}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: "#444" }}>STATUS: </span>
+              {isConnected ? (
+                <span style={{ color: "#1c9c31bd", fontWeight: "500" }}>CONNECTED</span>
+              ) : (
+                <span style={{ color: "#ef4444", fontWeight: "500" }}>DISCONNECTED</span>
+              )}
+            </div>
+            <div>
+              <span style={{ color: "#444" }}>ACTIVE WALLET: </span>
+              <span style={{ color: isConnected && userAddress ? "#fff" : "#555" }}>
+                {isConnected && userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`.toUpperCase() : "0XNONE"}
+              </span>
+            </div>
           </div>
+        </div>
 
+        {/* NEW ETCHED HORIZONTAL DIVIDER (Using your exact opacity weight) */}
+        <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "20px", margin: "0 0 40px 0" }}>
+          <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
         </div>
       </div>
-
-      <div style={{ paddingTop: "8px", marginBottom: "6px", paddingBottom: "6px" }}>
-        <h1 style={{ ...styles.title, fontSize: "18px", fontWeight: "100", margin: 0, paddingBottom: "10px" }}>EXCHANGE HISTORY</h1>
-      </div>  
-
-      {/* ERROR / LOADING ALERTS */}
-      {/*{error && (
-        <div style={{ ...styles.jsonDisplay, color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.2)", marginBottom: "30px" }}>
-          <strong>RESOLUTION ERROR:</strong> {error}
-        </div>
-      )}
-
-      {(!isConnected || loading) && (
-        <div style={{ ...styles.jsonDisplay, color: "#054e1a", marginBottom: "30px", maxHeight: "none" }}>
-          {loading && <div>Recompiling functional exchange entries...</div>}
-          {!isConnected && <div>Wallet connection absent. Connect an active workspace signer profile to parse internal tracking records.</div>}
-        </div>
-      )}
 
       {/* METRIC ANALYTICS CONTAINER ROW */}
       {isConnected && userAddress && !loading && (
         <div style={{ display: "flex", gap: "16px", marginBottom: "30px" }}>
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0 }}>
-            <span style={{ color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>TOTAL CONVERSION VOLUME</span>
+            <span style={{ ...styles.label, color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>TOTAL CONVERSION VOLUME</span>
             <hr style={styles.divider} />
-            <b style={{ fontSize: "16px", fontFamily: "monospace", fontWeight: "lighter", color: "#fff" }}>
+            <b style={{ fontSize: "16px", fontWeight: "lighter", color: "#fff" }}>
               {metrics.totalTransactions} <span style={{ fontSize: "12px", color: "#555" }}>ENTRIES</span>
             </b>
           </div>
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0 }}>
-            <span style={{ color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>CUMULATIVE PURCHASES</span>
+            <span style={{ ...styles.label, color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>CUMULATIVE PURCHASES</span>
             <hr style={styles.divider} />
-            <b style={{ fontSize: "16px", fontFamily: "monospace", fontWeight: "lighter", color: "#fff" }}>
+            <b style={{ fontSize: "16px", fontWeight: "lighter", color: "#fff" }}>
               {metrics.totalDeposited.toFixed(4)} <span style={{ fontSize: "12px", color: "#555" }}>ASSETS</span>
             </b>
           </div>
           <div style={{ ...styles.sectionCard, flex: 1, padding: "16px", margin: 0, border: "1px solid rgba(239, 68, 68, 0.15)" }}>
-            <span style={{ color: "#ef4444", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>CUMULATIVE LIQUIDATIONS</span>
+            <span style={{ ...styles.label, color: "#ef4444", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter", display: "block", marginBottom: "6px" }}>CUMULATIVE LIQUIDATIONS</span>
             <hr style={styles.divider} />
-            <b style={{ fontSize: "16px", fontFamily: "monospace", fontWeight: "light", color: "#ef4444" }}>
+            <b style={{ fontSize: "16px", fontWeight: "light", color: "#ef4444" }}>
               {metrics.totalLiquidated.toFixed(4)} <span style={{ fontSize: "12px", color: "rgba(239,68,68,0.5)" }}>ASSETS</span>
             </b>
           </div>
@@ -188,18 +187,18 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", textAlign: "left" }}>
             <thead>
             <tr style={{ borderBottom: "1px solid #161616", borderTop: "1px solid #161616" }}>
-                <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>TIMESTAMP</th>
-                <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>AMOUNT IN</th>
-                <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>AMOUNT OUT</th>
-                <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200" }}>RATE</th>
-                <th style={{ padding: "12px 8px", color: "#666666", fontSize: "11px", fontWeight: "200", textAlign: "right" }}>TX TYPE</th>
+                <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px" }}>TIMESTAMP</th>
+                <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px" }}>AMOUNT IN</th>
+                <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px" }}>AMOUNT OUT</th>
+                <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px" }}>RATE</th>
+                <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px", textAlign: "right" }}>TX TYPE</th>
             </tr>
             </thead>
             <tbody>
             {exchangeRecords.length === 0 ? (
                 <tr>
                 {/* Updated colSpan to 5 to perfectly match your 5 new headers */}
-                <td colSpan="5" style={{ padding: "30px 8px", color: "#444444", textAlign: "center", fontStyle: "italic" }}>
+                <td colSpan="5" style={{ ...styles.label, padding: "30px 8px", color: "#444444", textAlign: "center", fontStyle: "italic" }}>
                     {loading ? "Decrypting contract history streams..." : "No conversion history entries found for this wallet address profile..."}
                 </td>
                 </tr>
@@ -208,12 +207,12 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
                 <tr key={`exchange-row-${rec.index}-${rec.timestamp}`} style={{ borderBottom: "1px solid #111111" }}>
                     
                     {/* COLUMN 1: TIMESTAMP */}
-                    <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#aaaaaa" }}>
+                    <td style={{ ...styles.label, padding: "12px 8px", color: "#aaaaaa" }}>
                     {formatDate(rec.timestamp)}
                     </td>
 
                     {/* COLUMN 2: AMOUNT IN */}
-                    <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#ffffff" }}>
+                    <td style={{ ...styles.label, padding: "12px 8px", color: "#ffffff" }}>
                     {formatAllocation(rec.amountInStr)} 
                     <span style={{ fontSize: "10px", color: "#555", marginLeft: "4px" }}>
                         {rec.isIngress ? "Base" : "GBDo"}
@@ -221,7 +220,7 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
                     </td>
 
                     {/* COLUMN 3: AMOUNT OUT */}
-                    <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#ffffff" }}>
+                    <td style={{ ...styles.label, padding: "12px 8px", color: "#ffffff" }}>
                     {formatAllocation(rec.amountOutStr)}
                     <span style={{ fontSize: "10px", color: "#555", marginLeft: "4px" }}>
                         {rec.isIngress ? "GBDo" : "Base"}
@@ -229,18 +228,18 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
                     </td>
 
                     {/* COLUMN 4: EXCHANGE RATE */}
-                    <td style={{ padding: "12px 8px", fontFamily: "monospace", color: "#888888" }}>
+                    <td style={{ ...styles.label, padding: "12px 8px", color: "#888888" }}>
                     {formatAllocation(rec.exchangeRateStr || rec.exchangeRate)}
                     </td>
 
                     {/* COLUMN 5: TX TYPE (Based strictly on rec.refund condition) */}
-                    <td style={{ padding: "12px 8px", fontFamily: "monospace", textAlign: "right" }}>
+                    <td style={{ ...styles.label, padding: "12px 8px", textAlign: "right" }}>
                     {!rec.isRefund ? (
-                        <span style={{ color: "#1d5c34", fontSize: "11px", fontWeight: "600", background: "rgba(29,92,52,0.1)", padding: "2px 6px", borderRadius: "3px" }}>
+                        <span style={{ ...styles.label, color: "#1d5c34", fontSize: "11px", fontWeight: "600", background: "rgba(29,92,52,0.1)", padding: "2px 6px", borderRadius: "3px" }}>
                         BUY IN
                         </span>
                     ) : (
-                        <span style={{ color: "#ef4444", fontSize: "11px", fontWeight: "600", background: "rgba(239,68,68,0.1)", padding: "2px 6px", borderRadius: "3px" }}>
+                        <span style={{ ...styles.label, color: "#ef4444", fontSize: "11px", fontWeight: "600", background: "rgba(239,68,68,0.1)", padding: "2px 6px", borderRadius: "3px" }}>
                         LIQUIDATION
                         </span>
                     )}

@@ -57,8 +57,8 @@ function createWindow() {
   
   // 1. CREATE A SLEEK, FRAMELESS SPLASH WINDOW
   const splash = new BrowserWindow({
-    width: 400,
-    height: 400,
+    width: 300,
+    height: 300,
     frame: false,          // Removes the top window bar (close/minimize buttons)
     transparent: true,      // Allows transparent logos if your PNG has no background
     alwaysOnTop: true,      // Keeps it visible while the app boots up
@@ -225,7 +225,7 @@ app.on('window-all-closed', () => {
 });
 
 /// ==========================================
-// YOUR ORIGINAL VAULT LOGIC & IPC INTERCEPTOR
+// LOGIC & IPC INTERCEPTOR
 // ==========================================
 
 // Your helper function from the original snippet
@@ -234,36 +234,71 @@ function toISO(y, m, d, isEnd = false) {
   return isEnd ? `${y}-${m}-${d}T23:59:59.999Z` : `${y}-${m}-${d}T00:00:00.000Z`;
 }
 
-// Your core processing function
-async function vaultWithdrawalProcess(contracts, modes, startISO, endISO, withPayouts) {
-  console.log("ENGINE RUNNING with data:", { contracts, modes, startISO, endISO, withPayouts });
-  
-  // This is where your heavy lifting happens (Bitcoinjs, CSV writing, etc.)
-  // For now, we return a success message to show the UI it worked.
-  return { 
-    status: "Success", 
-    message: `Processed ${contracts.length} contracts in ${modes.length} mode(s).` 
-  };
-}
+// ========================================================
+// EMAIL HANDLER
+// ========================================================
 
-function rescaleAmount(amount, fromDecimals, toDecimals) {
-  if (fromDecimals === toDecimals) return amount;
-
-  if (fromDecimals > toDecimals) {
-    const factor = BigInt(10) ** BigInt(fromDecimals - toDecimals);
-    return (amount / factor); // downscale
-  } else {
-    const factor = BigInt(10) ** BigInt(toDecimals - fromDecimals);
-    return (amount * factor); // upscale
+function sanitizeBigInts(obj) {
+  if (typeof obj === "bigint") return obj.toString();
+  if (Array.isArray(obj)) return obj.map(sanitizeBigInts);
+  if (obj && typeof obj === "object") {
+    return Object.fromEntries(
+      Object.entries(obj).map(([key, value]) => [key, sanitizeBigInts(value)])
+    );
   }
+  return obj;
 }
 
-// This listens for the frontend dashboard to send data over the 'run-vault' bridge
-// ==================== BEFORE (ORIGINAL) ====================
-// (This space was completely empty)
+ipcMain.handle('send-smtp-email', async (event, emailPayload) => {
+  const payload = {
+    jsonrpc: "2.0",
+    method: "sendEmail",
+    params: {
+      firstname: params.firstname,
+      lastname: params.lastname,
+      email: params.email,
+      tx: params.tx,
+      checkoutAsset: params.checkoutAsset,
+      quantity: params.quantity,
+      totalTokenAmount: params.totalTokenAmount,
+      userAddress: params.userAddress,
+      tokenSymbol: params.tokenSymbol,
+      configuration: params.configuration,
+      address: params.address,
+      phone: params.phone,
+      country: params.country,
+      promo: params.promo,
+      postalCode: params.postalCode,
+      receipt: params.receipt,
+      purchaseMadeEvents: params.purchaseMadeEvents,
+    },
+    id: Date.now(),
+  };
 
-// ==================== AFTER (UPDATED SECURE) ====================
-// Checks if a secure credential profile exists on the user's hardware disk
+  try {
+    const res = await fetch("https://email.brantley-global.com", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.API_SECRET, // Secured inside GitHub Actions/Environment
+      },
+      body: JSON.stringify(sanitizeBigInts(payload)),
+    });
+
+    if (!res.ok) {
+      return { success: false, error: "Email sending failed" };
+    }
+    
+    return { success: true };
+  } catch (emailError) {
+    return { success: false, error: emailError.message };
+  }
+});
+
+// ========================================================
+// IN-MEMORY SIGN-IN HANDLER
+// ========================================================
+
 // 1. Declare a simple session object in the background memory (top of main.js)
 let activeAdminSession = {
   isConnected: false,
@@ -272,10 +307,6 @@ let activeAdminSession = {
   secret: "",
   password: ""
 };
-
-// ========================================================
-// REWRITTEN: IN-MEMORY IPC HANDLERS
-// ========================================================
 
 // 1. Checks if a live session currently exists in active memory
 ipcMain.handle('get-admin-status', async () => {
@@ -289,7 +320,7 @@ ipcMain.handle('get-admin-status', async () => {
 // 2. Holds cleartext inputs strictly inside Node's background RAM variable
 ipcMain.handle('secure-save-credentials', async (event, ...args) => {
   try {
-    // ELECTRON PARAMETER UNPACKING
+
     // This safely extracts your variables regardless of how your preload bridge forwards them
     let address, method, secret, password;
 
@@ -358,6 +389,10 @@ ipcMain.handle('secure-disconnect-wallet', async () => {
   return { success: true };
 });
 
+// ========================================================
+// ACCOUNT BALANCE HANDLER
+// ========================================================
+
 ipcMain.handle('blockchain:get-balances', async (event, userAddress) => {
   if (!userAddress || typeof userAddress !== 'string') return [];
 
@@ -420,6 +455,10 @@ ipcMain.handle('blockchain:get-balances', async (event, userAddress) => {
     return [];
   }
 });
+
+// ========================================================
+// XCHANGE HANDLER
+// ========================================================
 
 ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
 
@@ -552,6 +591,10 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
   }
 });
 
+// ========================================================
+// AFFILIATE HANDLER
+// ========================================================
+
 // Inside main.js
 ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, contractAddress, chainKey }) => {
   if (!userAddress || !contractAddress) return [];
@@ -580,6 +623,10 @@ ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, 
     throw error; 
   }
 });
+
+// ========================================================
+// PARTNER HANDLER
+// ========================================================
 
 // Add this under your existing handlers in main.js
 // Inside your main Electron process file where context bridges are set up
@@ -613,6 +660,10 @@ ipcMain.handle('blockchain:get-partner-ledger', async (event, { userAddress, con
     throw error;
   }
 });
+
+// ========================================================
+// INVESTOR PORTFOLIO HANDLER
+// ========================================================
 
 ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, { 
   userAddress, 
@@ -761,6 +812,10 @@ ipcMain.handle('blockchain:get-user-expanded-portfolio', async (event, {
     throw error;
   }
 });
+
+// ========================================================
+// INVESTMENT TRANSACTION HANDLER
+// ========================================================
 
 ipcMain.handle('submitDeposit', async (event, payload) => {
   const provider = providers.globalChain;
@@ -918,6 +973,10 @@ ipcMain.handle('submitWithdrawal', async (event, payload) => {
   }
 });
 
+// ========================================================
+// NATIVE ACQUISITION HANDLER
+// ========================================================
+
 ipcMain.handle('submit-acquisition', async (event, payload) => {
 
   const provider = providers.globalChain;
@@ -1061,6 +1120,10 @@ ipcMain.handle('submit-user-liquidate', async (event, payload) => {
   }
 });
 
+// ========================================================
+// NATIVE ACQUISITION HISTORY HANDLER
+// ========================================================
+
 ipcMain.handle('get-native-exchange-history', async (event, { userAddress }) => {
   try {
     const provider = providers.globalChain;
@@ -1109,6 +1172,10 @@ ipcMain.handle('get-native-exchange-history', async (event, { userAddress }) => 
     return { success: false, error: error.message, records: [] };
   }
 });
+
+// ========================================================
+// ADMIN QUERY & PURCHASE HANDLER
+// ========================================================
 
 ipcMain.handle('trigger-vault', async (event, payload) => {
   try {
@@ -1280,7 +1347,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
     }
 
     // ==========================================
-    // PATCHED: FLAT PURCHASE STATE CHANGE
+    // FLAT PURCHASE STATE CHANGE
     // ==========================================
     if (modeArg === "execute-state-change") {
       const provider = providers.globalChain;
@@ -1328,7 +1395,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       const shippingCost = BigInt(shippingTransitDays || 0); // Mapping transit metric or raw upcharge value
       const customizationCost = BigInt(customizationUpcharges || 0);
       const configsBytes32 = hardwareConfigBytes32; // Pre-packed config string from frontend
-      const quantity = BigInt(1); // Default to single item purchase or pull dynamically
+      const quantity = BigInt(quantity); // Default to single item purchase or pull dynamically
       const exchangeRate = BigInt(1); // Set conversion multiplier baseline
       const commissionAmount = BigInt(0);
       const regionId = BigInt(0); // Map destination region identifier if tracked on-chain
@@ -1400,5 +1467,106 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
   } catch (error) {
     console.error("Backend Contract Call Error:", error);
     return { status: "Error", error: error.message };
+  }
+});
+
+
+ipcMain.handle('query-swap-registry', async (event, payload) => {
+  // Destructure the payload sent from the UI dropdown matrix
+  const { mode, target } = payload;
+
+  const REGISTRY_ABI = [
+    "function getSwapsForUser(address user) external view returns (address[] memory)",
+    "function swapRegistry(address swap) external view returns (address swapAddress, address partyA, address partyB, address tokenA, address tokenB, uint256 amountA, uint256 amountB, uint8 status)"
+  ];
+
+  const SWAP_STATUS_MAP = [
+    "PendingDeposits", "PartyADeposited", "PartyBDeposited", "Completed",
+    "PartyAPayoutDone", "PartyBPayoutDone", "FullySettled", "PartyARefunded",
+    "PartyBRefunded", "FullyRefunded"
+  ];
+
+  try {
+    // Dynamically reference your production chain telemetry states
+    const provider = providers.globalChain;
+    const registryAddress = deployments.GlobalSwapRegistry;
+    
+    const registryContract = new ethers.Contract(registryAddress, REGISTRY_ABI, provider);
+
+    // =======================================================================
+    // ROUTE A: ACCOUNT USER LEDGER MONITOR MODE
+    // =======================================================================
+    if (mode === "USER") {
+      // Call Phase 1: Shell Addresses associated with this user
+      const swapShellAddresses = await registryContract.getSwapsForUser(target);
+
+      if (!swapShellAddresses || swapShellAddresses.length === 0) {
+        return { status: "Success", mode, target: target, totalSwapsFound: 0, records: [] };
+      }
+
+      // Call Phase 2: Batch Query Detail Resolving for all associated swap contracts
+      const detailedRecords = await Promise.all(
+        swapShellAddresses.map(async (address) => {
+          const details = await registryContract.swapRegistry(address);
+          return {
+            swapContractShell: details.swapAddress,
+            partyA: details.partyA,
+            partyB: details.partyB,
+            tokenA: details.tokenA,
+            tokenB: details.tokenB,
+            amountA: details.amountA.toString(), 
+            amountB: details.amountB.toString(),
+            statusCode: Number(details.status),
+            statusLabel: SWAP_STATUS_MAP[Number(details.status)] || "UnknownState"
+          };
+        })
+      );
+
+      return { 
+        status: "Success",
+        mode, 
+        target: target, 
+        totalSwapsFound: detailedRecords.length, 
+        records: detailedRecords 
+      };
+    } 
+    
+    // =======================================================================
+    // ROUTE B: SPECIFIC SINGLE SWAP ESCROW DEPLOYMENT ADDRESS MODE
+    // =======================================================================
+    else if (mode === "SWAP") {
+      const details = await registryContract.swapRegistry(target);
+      
+      // Enforce zero-address validation sanity checking
+      if (!details.swapAddress || details.swapAddress === "0x0000000000000000000000000000000000000000") {
+        return { 
+          status: "Not Found",
+          mode,
+          target: target, 
+          message: "This address does not occupy a recorded escrow contract allocation slot." 
+        };
+      }
+
+      return {
+        status: "Success",
+        mode,
+        target: target,
+        records: [{
+          swapContractShell: details.swapAddress,
+          partyA: details.partyA,
+          partyB: details.partyB,
+          tokenA: details.tokenA,
+          tokenB: details.tokenB,
+          amountA: details.amountA.toString(), 
+          amountB: details.amountB.toString(),
+          statusCode: Number(details.status),
+          statusLabel: SWAP_STATUS_MAP[Number(details.status)] || "UnknownState"
+        }]
+      };
+    }
+
+  } catch (error) {
+    console.error("Main process ledger read exception:", error);
+    return { status: "Exception", message: error.message || "EVM state sync failure." };
   }
 });

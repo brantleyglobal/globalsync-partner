@@ -48,7 +48,10 @@ function parseLocalNumber(rawNumber, locale = undefined) {
 
 export default function Sidebar({ 
   portalView, 
-  setPortalView, 
+  setPortalView,
+  lastVisitedMatrix,
+  setLastVisitedMatrix,
+  setRecentlyViewed,
   userAddress, 
   setUserAddress, 
   balances = [],
@@ -118,7 +121,7 @@ export default function Sidebar({
 
       // Calculate the expected GBDo output token metrics 
       // formula: amountIn * exchangeRate (or your app's specific custom conversion logic)
-      const computedAmountOut = amountFloat * parseFloat(exchangeRate || 1);
+      const computedAmountOut = amountFloat / parseFloat(exchangeRate);
 
       // Generate a pseudo-random, unique tracking hash for the smart contract's replay guard
       // We append the timestamp to a standard 32-byte hex template string
@@ -495,8 +498,8 @@ export default function Sidebar({
                   width: "6px", 
                   height: "6px", 
                   borderRadius: "50%", 
-                  background: showAuthDrawer ? "#4ade80" : "#333",
-                  boxShadow: showAuthDrawer ? "0 0 8px #4ade80" : "none"
+                  background: showAuthDrawer ? "#4ade807a" : "#333",
+                  boxShadow: showAuthDrawer ? "0 0 8px #4ade807a" : "none"
               }} />
               CONNECT WALLET
               </div>
@@ -533,7 +536,7 @@ export default function Sidebar({
               {authMethod === 'privateKey' && (
                   <>
                   <label style={styles.label}>PRIVATE KEY</label>
-                  <div style={{...styles.cryptoInputWrapper, marginBottom: '16px'}}>
+                  <div style={{...styles.label, marginBottom: '16px'}}>
                       <input
                         type={showKey ? "text" : "password"}
                         placeholder="••••••••••••••••••••••••"
@@ -562,15 +565,15 @@ export default function Sidebar({
                 <textarea
                     placeholder='{"version":3,"id":"...", "crypto":{...}}'
                     style={{
+                    ...styles.label,
                     width: "100%",
                     height: "70px",
                     background: "transparent",
                     border: "none",
                     outline: "none",
                     resize: "none",
-                    color: keystoreJson ? "#4ade80" : "#888",
+                    color: keystoreJson ? "#4ade80bd" : "#888",
                     fontSize: "10px",
-                    fontFamily: "monospace",
                     lineHeight: "1.4",
                     boxSizing: "border-box"
                     }}
@@ -678,15 +681,15 @@ export default function Sidebar({
                     <textarea
                       placeholder="Paste, type, or load your 12 or 24-word recovery seed phrase here..."
                       style={{
+                        ...styles.label,
                         width: "100%",
                         height: "60px",
                         background: "transparent",
                         border: "none",
                         outline: "none",
                         resize: "none",
-                        color: mnemonicPhrase ? "#4ade80" : "#888",
+                        color: mnemonicPhrase ? "#4ade80bd" : "#888",
                         fontSize: "10px",
-                        fontFamily: "monospace",
                         lineHeight: "1.4",
                         boxSizing: "border-box"
                       }}
@@ -830,8 +833,8 @@ export default function Sidebar({
                   width: "6px", 
                   height: "6px", 
                   borderRadius: "50%", 
-                  background: showPurchaseDrawer ? "#4ade80" : "#333",
-                  boxShadow: showPurchaseDrawer ? "0 0 8px #4ade80" : "none"
+                  background: showPurchaseDrawer ? "#4ade807a" : "#333",
+                  boxShadow: showPurchaseDrawer ? "0 0 8px #4ade807a" : "none"
               }} />
               GBDo GATEWAY
               </div>
@@ -860,19 +863,19 @@ export default function Sidebar({
                         flex: 1,
                         padding: "8px",
                         fontSize: "11px",
-                        fontWeight: "700",
+                        fontWeight: "600",
                         borderRadius: "4px",
                         border: "1px solid #222",
                         cursor: "pointer",
                         background: transactionType === "deposit" ? "#1a1a1a" : "transparent",
-                        color: transactionType === "deposit" ? "#4ade80" : "#666",
+                        color: transactionType === "deposit" ? "#4ade807a" : "#666",
                       }}
                       onClick={() => {
                         setTransactionType("deposit");
                         setPledgedAmount(""); // Reset inputs on switch to keep states clean
                       }}
                     >
-                      DEPOSIT NATIVE
+                      PURCHASE NATIVE
                     </button>
                     <button
                       type="button"
@@ -892,7 +895,7 @@ export default function Sidebar({
                         setPledgedAmount("");
                       }}
                     >
-                      CASH OUT NATIVE
+                      EXCHANGE NATIVE
                     </button>
                   </div>
 
@@ -908,7 +911,7 @@ export default function Sidebar({
                         value={pledgedToken}
                         onChange={(e) => setPledgedToken(e.target.value)}
                       >
-                        <option value="" disabled style={{ background: "#121212" }}>
+                        <option value="" disabled style={{ ...styles.inputElement, background: "#121212" }}>
                           Select {transactionType === "deposit" ? "Deposit" : "Withdrawal"} Asset
                         </option>
                         {Array.isArray(supportedTokens) && supportedTokens
@@ -929,7 +932,7 @@ export default function Sidebar({
                           type="text"
                           inputMode="decimal"
                           pattern="[0-9]*"
-                          placeholder={transactionType === "deposit" ? "Enter Amount Requested" : "Enter Amount to Cash Out"}
+                          placeholder={transactionType === "deposit" ? "Enter Requested Amount" : "Enter Amount to Cash Out"}
                           style={{...styles.sidebarInput, marginBottom: 0, paddingRight: '45px'}}
                           value={pledgedAmount}
                           onChange={(e) => {
@@ -959,11 +962,11 @@ export default function Sidebar({
                           <span style={{ fontSize: "10px", color: "#555", fontWeight: "600", letterSpacing: "0.5px" }}>
                             {transactionType === "deposit" ? "ESTIMATED GBDo" : `ESTIMATED ${pledgedToken || "NATIVE"}`}
                           </span>
-                          <span style={{ 
-                            fontSize: "13px", 
-                            color: pledgedAmount && exchangeRate ? "#4ade80" : "#444", 
-                            fontWeight: "400", 
-                            fontFamily: "monospace" 
+                          <span style={{
+                            ...styles.label,
+                            fontSize: "11px", 
+                            color: pledgedAmount && exchangeRate ? "#4ade807a" : "#444", 
+                            fontWeight: "400",
                           }}>
                             {(() => {
                               const amount = parseFloat(String(pledgedAmount).replace(/,/g, ''));
@@ -972,11 +975,11 @@ export default function Sidebar({
                               if (!isNaN(amount) && !isNaN(rate) && amount > 0 && rate > 0) {
                                 if (transactionType === "deposit") {
                                   // Deposit: Token Amount * Rate = GBDo Received
-                                  const totalGbdo = amount * rate;
+                                  const totalGbdo = amount / rate;
                                   return `${totalGbdo.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} GBDo`;
                                 } else {
                                   // Cash Out: GBDo Amount / Rate = Native Token Returned
-                                  const totalNative = amount / rate;
+                                  const totalNative = amount * rate;
                                   return `${totalNative.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ${pledgedToken}`;
                                 }
                               }
@@ -990,7 +993,7 @@ export default function Sidebar({
                         {exchangeRate && pledgedToken && (
                           <div style={{ fontSize: "10px", color: "#666", margin: "2px 0 8px 4px", display: "flex", justifyContent: "space-between" }}>
                             <span>CONVERSION RATE:</span>
-                            <span style={{ fontFamily: "monospace", color: "#aaa" }}>
+                            <span style={{ ...styles.label, color: "#aaa" }}>
                               1 {pledgedToken} ≈ {isFinite(parseFloat(exchangeRate)) ? parseFloat(exchangeRate).toFixed(4) : "0.00"} GBDo
                             </span>
                           </div>
@@ -1054,15 +1057,25 @@ export default function Sidebar({
               width: "6px", 
               height: "6px", 
               borderRadius: "50%", 
-              background: isConnected ? "#4ade80" : "#333",
-              boxShadow: isConnected ? "0 0 8px #4ade80" : "none",
+              background: isConnected ? "#4ade807a" : "#333",
+              boxShadow: isConnected ? "0 0 8px #4ade807a" : "none",
               display: "inline-block"
             }} />
             WORKSPACE PORTALS
           </span>
           
           <button 
-              onClick={() => setPortalView('admin')}
+              onClick={() => {
+                setPortalView('admin'); 
+                setLastVisitedMatrix('admin');
+                localStorage.setItem('last_visited_matrix', 'admin');
+                
+                setRecentlyViewed(prev => {
+                  const next = ['admin', ...prev.filter(k => k !== 'admin')].slice(0, 3);
+                  localStorage.setItem('recently_viewed', JSON.stringify(next));
+                  return next;
+                });
+              }}
               style={{
               ...styles.navItem, 
               background: portalView === 'admin' ? "rgba(0, 0, 0, 0.36)" : "transparent",
@@ -1075,7 +1088,17 @@ export default function Sidebar({
           </button>
 
           <button 
-              onClick={() => setPortalView('swap')}
+              onClick={() => {
+                setPortalView('swap'); 
+                setLastVisitedMatrix('swap');
+                localStorage.setItem('last_visited_matrix', 'swap');
+
+                setRecentlyViewed(prev => {
+                  const next = ['swap', ...prev.filter(k => k !== 'swap')].slice(0, 3);
+                  localStorage.setItem('recently_viewed', JSON.stringify(next));
+                  return next;
+                });
+              }}
               style={{
               ...styles.navItem, 
               background: portalView === 'swap' ? "rgba(0, 0, 0, 0.36)" : "transparent",
@@ -1088,7 +1111,17 @@ export default function Sidebar({
           </button>
 
           <button 
-              onClick={() => setPortalView('gateway')}
+              onClick={() => {
+                setPortalView('gateway'); 
+                setLastVisitedMatrix('gateway');
+                localStorage.setItem('last_visited_matrix', 'gateway');
+
+                setRecentlyViewed(prev => {
+                  const next = ['gateway', ...prev.filter(k => k !== 'gateway')].slice(0, 3);
+                  localStorage.setItem('recently_viewed', JSON.stringify(next));
+                  return next;
+                });
+              }}
               style={{
               ...styles.navItem, 
               background: portalView === 'gateway' ? "rgba(0, 0, 0, 0.36)" : "transparent",
@@ -1101,7 +1134,17 @@ export default function Sidebar({
           </button>
 
           <button 
-              onClick={() => setPortalView('affiliate')}
+              onClick={() => {
+                setPortalView('affiliate'); 
+                setLastVisitedMatrix('affiliate');
+                localStorage.setItem('last_visited_matrix', 'affiliate');
+
+                setRecentlyViewed(prev => {
+                  const next = ['affiliate', ...prev.filter(k => k !== 'affiliate')].slice(0, 3);
+                  localStorage.setItem('recently_viewed', JSON.stringify(next));
+                  return next;
+                });
+              }}
               style={{
               ...styles.navItem, 
               background: portalView === 'affiliate' ? "rgba(0, 0, 0, 0.36)" : "transparent",
@@ -1114,7 +1157,17 @@ export default function Sidebar({
           </button>
 
           <button 
-              onClick={() => setPortalView('wholesale')}
+              onClick={() => {
+                setPortalView('wholesale'); 
+                setLastVisitedMatrix('wholesale');
+                localStorage.setItem('last_visited_matrix', 'wholesale');
+
+                setRecentlyViewed(prev => {
+                  const next = ['wholesale', ...prev.filter(k => k !== 'wholesale')].slice(0, 3);
+                  localStorage.setItem('recently_viewed', JSON.stringify(next));
+                  return next;
+                });
+              }}
               style={{
               ...styles.navItem, 
               background: portalView === 'wholesale' ? "rgba(0, 0, 0, 0.36)" : "transparent",
@@ -1127,7 +1180,17 @@ export default function Sidebar({
           </button>
 
           <button 
-              onClick={() => setPortalView('investments')}
+              onClick={() => {
+                setPortalView('investments'); 
+                setLastVisitedMatrix('investments');
+                localStorage.setItem('last_visited_matrix', 'investments');
+
+                setRecentlyViewed(prev => {
+                  const next = ['investments', ...prev.filter(k => k !== 'investments')].slice(0, 3);
+                  localStorage.setItem('recently_viewed', JSON.stringify(next));
+                  return next;
+                });
+              }}
               style={{
               ...styles.navItem, 
               background: portalView === 'investments' ? "rgba(0, 0, 0, 0.36)" : "transparent",
@@ -1216,7 +1279,7 @@ export default function Sidebar({
                     })
                 )
             ) : (
-                <span style={{ color: "#ef4444", fontWeight: "lighter", fontSize: "9px" }}>NO WALLET DETECTED</span>
+                <span style={{ ...styles.label, color: "#ef4444", fontWeight: "lighter", fontSize: "9px" }}>NO WALLET DETECTED</span>
             )}
         </div>
         </div>

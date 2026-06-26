@@ -4,6 +4,18 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Expose secure internal wallet management methods to your React UI
 contextBridge.exposeInMainWorld('electronAPI', {
 
+  saveAdminCredentials: (address, method, secret, password) => 
+    ipcRenderer.invoke('secure-save-credentials', { address, method, secret, password }),
+    
+  disconnectAdmin: () => 
+    ipcRenderer.invoke('secure-disconnect-wallet'),
+
+  getAdminStatus: () => 
+    ipcRenderer.invoke('get-admin-status'),
+  
+  sendEmail: (payload) =>
+    ipcRenderer.invoke('send-smtp-email', payload),
+
   swapRegistry: (payload) =>
     ipcRenderer.invoke('blockchain:swap-registry', payload),
 
@@ -36,16 +48,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   getUserOverview: (data) =>
   ipcRenderer.invoke('blockchain:get-user-overview', data),
-  
-  saveAdminCredentials: (address, method, secret, password) => 
-    ipcRenderer.invoke('secure-save-credentials', { address, method, secret, password }),
-    
-  disconnectAdmin: () => 
-    ipcRenderer.invoke('secure-disconnect-wallet'),
-
-  getAdminStatus: () => 
-    ipcRenderer.invoke('get-admin-status'),
 
   executeTransaction: (txData) =>
-    ipcRenderer.invoke('secure-execute-transaction', txData)
+    ipcRenderer.invoke('secure-execute-transaction', txData),
+
+  querySwapRegistry: (targetAddress) =>
+    ipcRenderer.invoke('query-swap-registry', targetAddress)
 });
