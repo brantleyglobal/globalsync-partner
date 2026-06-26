@@ -435,16 +435,8 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
               </span>
             </div>
             <div>
-              <span style={{ color: "#444" }}>STATUS: </span>
-              {isConnected ? (
-                <span style={{ color: "#1c9c31bd", fontWeight: "500" }}>CONNECTED</span>
-              ) : (
-                <span style={{ color: "#ef4444", fontWeight: "500" }}>DISCONNECTED</span>
-              )}
-            </div>
-            <div>
               <span style={{ color: "#444" }}>ACTIVE WALLET: </span>
-              <span style={{ color: isConnected && userAddress ? "#fff" : "#555" }}>
+              <span style={{ color: isConnected && userAddress ? "#1c9c31bd" : "#555" }}>
                 {isConnected && userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`.toUpperCase() : "0XNONE"}
               </span>
             </div>
@@ -456,6 +448,15 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
         </div>
       </div>
 
+      {/* ACCESS & OPERATIONAL MONITOR */}
+      {(!isConnected || error || loading) && (
+        <div style={{ ...styles.jsonDisplay, color: error ? "#ef4444" : "#054e1a", marginBottom: "30px", maxHeight: "none" }}>
+          {loading && <div>Reading investment records...</div>}
+          {error && <div><strong>AUTHORIZATION FAILURE:</strong> {error}</div>}
+          {!userAddress && <div>Ready to initialize. Connect your wallet to extract active investment records.</div>}
+        </div>
+      )}
+
       {/* ACTION TRIGGERS BAR */}
       <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
         <button style={styles.btnForestGreen} onClick={() => setIsDepositModalOpen(true)}>
@@ -466,15 +467,6 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
         </button>
       </div>
 
-      {/* ACCESS & OPERATIONAL MONITOR */}
-      {(!isConnected || error || loading) && (
-        <div style={{ ...styles.jsonDisplay, color: error ? "#ef4444" : "#054e1a", marginBottom: "30px", maxHeight: "none" }}>
-          {loading && <div>Reading investment records...</div>}
-          {error && <div><strong>AUTHORIZATION FAILURE:</strong> {error}</div>}
-          {!userAddress && <div>Ready to initialize. Connect your wallet to extract active investment records.</div>}
-        </div>
-      )}
-
       {/* DASHBOARD LAYOUT GRID */}
       <div style={{ ...styles.gridContainer, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "20px" }}>        
         
@@ -483,9 +475,13 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
           <div style={{ paddingTop: "0px", marginBottom: "4px", paddingBottom: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "16px" }}>
               <h2 style={styles.sectionTitle}>Global Portfolio Overview</h2>
-              <div style={{ fontSize: "13px" }}>
-                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600" }}>TO DATE: </span>
-                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px" }}>{overviewTotal}</b>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600", display: "block" }}>
+                  TO DATE
+                </span>
+                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px", display: "block" }}>
+                  {overviewTotal}
+                </b>
               </div>
             </div>
           </div>
@@ -542,9 +538,13 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
           <div style={{ paddingTop: "0px", marginBottom: "4px", paddingBottom: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "16px" }}>
               <h2 style={styles.sectionTitle}>Asset Procurement History</h2>
-              <div style={{ fontSize: "13px" }}>
-                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600" }}>TO DATE: </span>
-                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px" }}>{purchaseTotal}</b>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600", display: "block" }}>
+                  TO DATE
+                </span>
+                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px", display: "block" }}>
+                  {purchaseTotal}
+                </b>
               </div>
             </div>
           </div>
@@ -627,9 +627,13 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
           <div style={{ paddingTop: "0px", marginBottom: "4px", paddingBottom: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "16px" }}>
               <h2 style={styles.sectionTitle}>Venture Deposit History</h2>
-              <div style={{ fontSize: "13px" }}>
-                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600" }}>TO DATE: </span>
-                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px" }}>{vaultDepositTotal}</b>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600", display: "block" }}>
+                  TO DATE
+                </span>
+                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px", display: "block" }}>
+                  {vaultDepositTotal}
+                </b>
               </div>
             </div>
           </div>
@@ -686,9 +690,13 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
           <div style={{ paddingTop: "0px", marginBottom: "4px", paddingBottom: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "16px" }}>
               <h2 style={styles.sectionTitle}>Venture Deposit History</h2>
-              <div style={{ fontSize: "13px" }}>
-                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600" }}>TO DATE: </span>
-                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px" }}>{ventureDepositTotal}</b>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600", display: "block" }}>
+                  TO DATE
+                </span>
+                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px", display: "block" }}>
+                  {ventureDepositTotal}
+                </b>
               </div>
             </div>
           </div>
@@ -745,9 +753,13 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
           <div style={{ paddingTop: "0px", marginBottom: "4px", paddingBottom: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "16px" }}>
               <h2 style={styles.sectionTitle}>Vault Withdrawal History</h2>
-              <div style={{ fontSize: "13px" }}>
-                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600" }}>TO DATE: </span>
-                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px" }}>{vaultWithdrawTotal}</b>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600", display: "block" }}>
+                  TO DATE
+                </span>
+                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px", display: "block" }}>
+                  {vaultWithdrawTotal}
+                </b>
               </div>
             </div>
           </div>
@@ -808,9 +820,13 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
           <div style={{ paddingTop: "0px", marginBottom: "4px", paddingBottom: "4px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "16px" }}>
               <h2 style={styles.sectionTitle}>Vault Withdrawal History</h2>
-              <div style={{ fontSize: "13px" }}>
-                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600" }}>TO DATE: </span>
-                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px" }}>{ventureWithdrawTotal}</b>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ ...styles.label, color: "#888", fontSize: "10px", letterSpacing: "0.5px", fontWeight: "600", display: "block" }}>
+                  TO DATE
+                </span>
+                <b style={{ ...styles.label, color: "#d3d3d3", fontSize: "10px", display: "block" }}>
+                  {ventureWithdrawTotal}
+                </b>
               </div>
             </div>
           </div>

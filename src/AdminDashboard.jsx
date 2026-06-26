@@ -107,12 +107,12 @@ export default function AdminDashboard() {
   });
     
   const matrixNames = {
-    investments: "Investor Matrix",
-    wholesale: "Wholesaler Matrix",
-    affiliate: "Affiliate Matrix",
-    swap: "Global Gateway Matrix",
-    gateway: "XChange Dashboard",
-    admin: "Administrative Dashboard"
+    investments: "INVESTOR MATRIX",
+    wholesale: "WHOLESALER MATRIX",
+    affiliate: "AFFILIATE MATRIX",
+    swap: "GLOBAL GATEWAY MATRIX",
+    gateway: "XCHANGE DASHBOARD",
+    admin: "ADMINISTRATIVE DASHBOARD"
   };
 
   const navigateToMatrix = (matrixKey) => {
@@ -726,10 +726,10 @@ export default function AdminDashboard() {
 
       {/* MASTER DEFAULT LANDING: SYSTEM OPERATIONS HUB */}
       {(!portalView || portalView === 'hub') && (
-        <div style={{ padding: "48px 64px", maxWidth: "1400px", width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+        <div style={{ ...styles.mainContent, display: "flex", flexDirection: "column", width: "100%", boxSizing: "border-box" }}>
           
           {/* HEADER LAYER: Minimalist Typography */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid #111", paddingBottom: "16px", marginBottom: "40px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", paddingBottom: "16px", marginBottom: "40px" }}>
             <div>
               <h1 style={{ ...styles.label, color: "#ffffff", fontSize: "20px", fontWeight: "300", letterSpacing: "1px", margin: "0 0 4px 0" }}>GLOBAL PARTNER HUB</h1>
               <p style={{ color: "#555", fontSize: "11px", letterSpacing: "0.5px", margin: 0 }}>
@@ -746,16 +746,8 @@ export default function AdminDashboard() {
                 </span>
               </div>
               <div>
-                <span style={{ color: "#444" }}>STATUS: </span>
-                {isConnected ? (
-                  <span style={{ color: "#1c9c31bd", fontWeight: "500" }}>CONNECTED</span>
-                ) : (
-                  <span style={{ color: "#ef4444", fontWeight: "500" }}>DISCONNECTED</span>
-                )}
-              </div>
-              <div>
               <span style={{ color: "#444" }}>ACTIVE WALLET: </span>
-              <span style={{ color: isConnected && userAddress ? "#fff" : "#555" }}>
+              <span style={{ color: isConnected && userAddress ? "#1c9c31bd" : "#555" }}>
                 {isConnected && userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`.toUpperCase() : "0XNONE"}
               </span>
             </div>
@@ -858,12 +850,12 @@ export default function AdminDashboard() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
             
             {[
-              { id: 'admin', title: 'Administrative Dashboard', desc: 'Settlements, system audits, and deposits.', label: 'CORE_ENGINE', val: 'SECURE' },
-              { id: 'wholesale', title: 'Wholesaler Matrix', desc: 'Track inventory purchases and corporate credits.', label: 'CUMULATIVE_VOLUME', val: !isConnected && wholesaleTotal ? `$${wholesaleTotal}` : "0" },
-              { id: 'investments', title: 'Investor Matrix', desc: 'Portfolio view and execution dashboard.', label: 'OUTSTANDING', val: !isConnected && portfolioTotal ? portfolioTotal : "0.00 GBDo"},
-              { id: 'gateway', title: 'Global Dollar Gateway', desc: 'Liquidity flow configurations and exchanges.', label: 'GATEWAY_ROUTER', val: 'ACTIVE' },
-              { id: 'swap', title: 'Global XChange Matrix', desc: 'Escrowed swap executions and counterparties.', label: 'ESCROW_SYSTEM', val: 'STABLE' },
-              { id: 'affiliate', title: 'Affiliate Matrix', desc: 'Performance analytics and distribution loops.', label: 'COMMISSIONS', val: `${(!isConnected && affiliateTotal) ? `$${String(affiliateTotal).trim()}` : "0.00"} GBDo` }
+              { id: 'admin', title: 'ADMINISTRATIVE DASHBOARD', desc: 'Settlements, system audits, and deposits.', label: 'CORE_ENGINE', val: 'SECURE' },
+              { id: 'wholesale', title: 'WHOLESALER MATRIX', desc: 'Track inventory purchases and corporate credits.', label: 'CUMULATIVE_VOLUME', val: !isConnected && wholesaleTotal ? `$${wholesaleTotal}` : "0" },
+              { id: 'investments', title: 'INVESTOR MATRIX', desc: 'Portfolio view and execution dashboard.', label: 'OUTSTANDING', val: !isConnected && portfolioTotal ? portfolioTotal : "0.00 GBDo"},
+              { id: 'gateway', title: 'GLOBAL DOLLAR GATEWAY', desc: 'Liquidity flow configurations and exchanges.', label: 'GATEWAY_ROUTER', val: 'ACTIVE' },
+              { id: 'swap', title: 'GLOBAL XCHANGE MATRIX', desc: 'Escrowed swap executions and counterparties.', label: 'ESCROW_SYSTEM', val: 'STABLE' },
+              { id: 'affiliate', title: 'AFFILIATE MATRIX', desc: 'Performance analytics and distribution loops.', label: 'COMMISSIONS', val: `${(!isConnected && affiliateTotal) ? `$${String(affiliateTotal).trim()}` : "0.00"} GBDo` }
             ].map((m) => (
               <div 
                 key={m.id}

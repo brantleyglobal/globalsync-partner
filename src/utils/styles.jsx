@@ -210,7 +210,7 @@ export const styles = {
   },
   label: {
     fontSize: "10px",
-    fontWeight: "600",
+    fontWeight: "400",
     color: "#666666",
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     letterSpacing: "1px",

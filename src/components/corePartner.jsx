@@ -207,16 +207,8 @@ export default function PartnerPortal({
               </span>
             </div>
             <div>
-              <span style={{ color: "#444" }}>STATUS: </span>
-              {isConnected ? (
-                <span style={{ color: "#1c9c31bd", fontWeight: "500" }}>CONNECTED</span>
-              ) : (
-                <span style={{ color: "#ef4444", fontWeight: "500" }}>DISCONNECTED</span>
-              )}
-            </div>
-            <div>
               <span style={{ color: "#444" }}>ACTIVE WALLET: </span>
-              <span style={{ color: isConnected && userAddress ? "#fff" : "#555" }}>
+              <span style={{ color: isConnected && userAddress ? "#1c9c31bd" : "#555" }}>
                 {isConnected && userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`.toUpperCase() : "0XNONE"}
               </span>
             </div>

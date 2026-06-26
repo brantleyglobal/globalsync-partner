@@ -132,16 +132,8 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
               </span>
             </div>
             <div>
-              <span style={{ color: "#444" }}>STATUS: </span>
-              {isConnected ? (
-                <span style={{ color: "#1c9c31bd", fontWeight: "500" }}>CONNECTED</span>
-              ) : (
-                <span style={{ color: "#ef4444", fontWeight: "500" }}>DISCONNECTED</span>
-              )}
-            </div>
-            <div>
               <span style={{ color: "#444" }}>ACTIVE WALLET: </span>
-              <span style={{ color: isConnected && userAddress ? "#fff" : "#555" }}>
+              <span style={{ color: isConnected && userAddress ? "#1c9c31bd" : "#555" }}>
                 {isConnected && userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`.toUpperCase() : "0XNONE"}
               </span>
             </div>
@@ -153,6 +145,14 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
           <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
         </div>
       </div>
+
+      {(!isConnected || error || loading) && (
+        <div style={{ ...styles.jsonDisplay, color: error ? "#ef4444" : "#054e1a", marginBottom: "30px", maxHeight: "none" }}>
+          {loading && <div>Reading investment records...</div>}
+          {error && <div><strong>AUTHORIZATION FAILURE:</strong> {error}</div>}
+          {!userAddress && <div>Ready to initialize. Connect your wallet to extract active affiliate records.</div>}
+        </div>
+      )}
 
       {/* METRIC ANALYTICS CONTAINER ROW */}
       {isConnected && userAddress && !loading && (

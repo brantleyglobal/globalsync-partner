@@ -94,16 +94,8 @@ export default function CoreAdminEngine({
               </span>
             </div>
             <div>
-              <span style={{ color: "#444" }}>STATUS: </span>
-              {isConnected ? (
-                <span style={{ color: "#1c9c31bd", fontWeight: "500" }}>CONNECTED</span>
-              ) : (
-                <span style={{ color: "#ef4444", fontWeight: "500" }}>DISCONNECTED</span>
-              )}
-            </div>
-            <div>
               <span style={{ color: "#444" }}>ACTIVE WALLET: </span>
-              <span style={{ color: isConnected && userAddress ? "#fff" : "#555" }}>
+              <span style={{ color: isConnected && userAddress ? "#1c9c31bd" : "#555" }}>
                 {isConnected && userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`.toUpperCase() : "0XNONE"}
               </span>
             </div>
@@ -143,7 +135,7 @@ export default function CoreAdminEngine({
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
                   >
-                    <option value="" disabled style={{ background: "#121212", color: "#555" }}>Select Action</option>
+                    <option value="" disabled style={{ background: "#121212", color: "#555" }}>Log Type</option>
                     <option value="DEPOSIT" style={{ background: "#121212" }}>Deposit Logs</option>
                     <option value="WITHDRAW" style={{ background: "#121212" }}>Withdraw Logs</option>
                   </select>
@@ -188,14 +180,14 @@ export default function CoreAdminEngine({
             </div>
 
             <button style={{ ...styles.btnForestGreen, marginTop: "16px" }} onClick={handleTimestampQuery}>
-              EXECUTE CHRONO QUERY
+              EXECUTE QUERY
             </button>
           </div>
 
-          {/* SECTION 2 — DEPOSIT ATTESTATION VERIFICATION */}
+          {/* SECTION 2 — DEPOSIT VERIFICATION */}
           <div style={{ ...styles.sectionCard, margin: 0 }}>
-            <h2 style={styles.sectionTitle}>DEPOSIT VERIFICATION PROTOCOL</h2>
-            <label style={styles.label}>CRYPTOGRAPHIC TRANSACTION HASH</label>
+            <h2 style={styles.sectionTitle}>DEPOSIT VERIFICATION</h2>
+            <label style={styles.label}>DEPOSIT TRANSACTION HASH</label>
             <input type="text" placeholder="0x..." style={styles.inputElement} value={transactionHash} onChange={(e) => setTransactionHash(e.target.value)} />
             
             <label style={styles.label}>SETTLEMENT CUSTODIAL VAULT</label>
@@ -209,7 +201,7 @@ export default function CoreAdminEngine({
             </select>
 
             <button style={styles.btnForestGreen} onClick={handleVerifyDeposit}>
-              RUN COMPLIANCE VERIFICATION
+              RUN VERIFICATION
             </button>
           </div>
         </div>
@@ -229,7 +221,7 @@ export default function CoreAdminEngine({
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
                   >
-                    <option value="" disabled style={{ background: "#121212" }}>Select Stream</option>
+                    <option value="" disabled style={{ background: "#121212" }}>Transaction Type</option>
                     <option value="DEPOSIT" style={{ background: "#121212" }}>Deposits</option>
                     <option value="WITHDRAW" style={{ background: "#121212" }}>Withdrawals</option>
                   </select>
@@ -245,7 +237,7 @@ export default function CoreAdminEngine({
                 </div>
               </div>
 
-              <label style={styles.label}>TARGET BLOCKCHAIN WALLET ADDRESS</label>
+              <label style={styles.label}>TARGET WALLET ADDRESS</label>
               <input
                 type="text"
                 placeholder="0x..."
@@ -306,7 +298,7 @@ export default function CoreAdminEngine({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
           <div>
-            <span style={{ ...styles.label, fontSize: "10px", color: "#8d8d8d" }}>CORE SYSTEM / USER QUERY LOGS</span>
+            <span style={{ ...styles.label, fontSize: "10px", color: "#8d8d8d" }}>CORE SYSTEM | USER QUERY LOGS</span>
             {/* CORE SYSTEM / USER QUERY LOGS */}
             <pre style={{ ...styles.jsonDisplay, overflowX: "auto", maxHeight: "220px", marginTop: "6px", background: "#050505", border: "1px solid #222" }}>
               {(() => {
