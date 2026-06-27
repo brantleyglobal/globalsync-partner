@@ -108,9 +108,9 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
 
       // --- SLIPPAGE & CONVERSION MATH ---
       // Fetch system exchange rate dynamically from system cache/oracles
-      let tokenConversionRate = 1;
+      let tokenConversionRate;
+      const { rateData, gbdoRate } = await getExchangeRates();
       try {
-        const rateData = await getExchangeRates();
         // Adjust this string parsing depending on how your state maps token entities
         const paymentTokenSymbol = typeof depositToken === "object" ? depositToken.symbol : "TOKEN";
         
@@ -122,7 +122,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
         console.warn("Pre-flight bridge check failed to read exchangeData pool.", e);
       }
 
-      const computedAmountOut = amountFloat * tokenConversionRate;
+      const computedAmountOut = amountFloat * ( tokenConversionRate / gbdoRate);
       const targetDecimalsBase18 = 18;
       
       const safeFixedString = computedAmountOut.toFixed(18).replace(/e[-+]\d+/, (match) => {
