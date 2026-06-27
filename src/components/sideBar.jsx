@@ -1,7 +1,7 @@
 // src/components/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
 import { ethers } from "ethers";
-import { styles } from '../utils/styles.jsx';
+import { styles, modalStyles } from '../utils/styles.jsx';
 import logo from '../assets/logo.png';
 import { supportedTokens } from '../utils/tokensX';
 import { getExchangeRates } from "../utils/exchangeRates";
@@ -88,6 +88,8 @@ export default function Sidebar({
   const [showAuthDrawer, setShowAuthDrawer] = useState(false);
   const [showPurchaseDrawer, setShowPurchaseDrawer] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
 
   const [transactionType, setTransactionType] = useState("deposit");
   const [depositHash, setDepositHash] = useState("");
@@ -1206,82 +1208,56 @@ export default function Sidebar({
         <hr style={styles.divider} />
 
         {/* ACCOUNT BALANCES DISPLAY (MIDDLE PANEL) */}
-        <div style={{ 
-        background: "rgba(0, 0, 0, 0.4)", 
-        padding: "14px 12px", 
-        borderRadius: "4px", 
-        border: "1px solid #000000d0", 
-        margin: "0 12px 24px 12px",
-        fontSize: "12px",
-        fontFamily: "system-ui, sans-serif"
-        }}>
-        <span style={{ color: "#666", display: "block", marginBottom: "12px", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter" }}>
-            ACCOUNT BALANCES:
-        </span>
-        
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {isConnected ? (
-                // SAFE CHECK: Defends your layout if balances is null/undefined or not an array
-                (!balances || !Array.isArray(balances) || balances.length === 0) ? (
-                <div style={{ color: "#555", fontStyle: "italic" }}>No positive balances found or loading...</div>
-                ) : (
-                    balances.map((token, index) => {
-                        // COMPLIANCE FALLBACKS: Prevents calculation explosions if properties are missing
-                        const rawBalance = token?.balance || "0";
-                        const decimals = typeof token?.decimals === "number" ? token.decimals : 18; 
-                        const symbol = token?.symbol || "UNKNOWN";
-                        const chain = token?.chain || "network";
-                        const uniqueKey = token?.address ? `${chain}-${token.address}` : `${chain}-${symbol}-${index}`;
-
-                        let formattedBalance = "0.0000";
-
-                        try {
-                        // HYBRID INT MATH: Uses floating strings if parsing a massive native BigInt string
-                        if (typeof rawBalance === 'string' && rawBalance.length > 15) {
-                            const pad = rawBalance.padStart(decimals + 1, '0');
-                            const splitIdx = pad.length - decimals;
-                            const whole = pad.slice(0, splitIdx);
-                            const fraction = pad.slice(splitIdx, splitIdx + 4); // Capture up to 4 decimal places
-                            formattedBalance = `${Number(whole).toLocaleString()}.${fraction}`;
-                        } else {
-                            formattedBalance = (Number(rawBalance) / Math.pow(10, decimals)).toFixed(4);
-                        }
-                        } catch (mathErr) {
-                        console.error("Balance parser engine failed:", mathErr);
-                        formattedBalance = "0.0000";
-                        }
-
-                        return (
-                        <div 
-                            key={uniqueKey} 
-                            style={{ 
-                            display: "flex", 
-                            justifyContent: "space-between", 
-                            alignItems: "center",
-                            borderBottom: "1px solid rgba(255, 255, 255, 0.03)",
-                            paddingBottom: "6px"
-                            }}
-                        >
-                            <div>
-                            <span style={{ color: "#888", fontSize: "9px", textTransform: "uppercase", background: "rgba(255,255,255,0.05)", padding: "1px 4px", borderRadius: "3px" }}>
-                                {chain}
-                            </span>
-                            <span style={{ color: "#ffffff", fontSize: "11px", fontWeight: "600", marginRight: "6px" }}>
-                                {symbol}
-                            </span>
-                            </div>
-                            
-                            <b style={{ color: "#d3d3d3", fontSize: "9px", fontWeight: "bold", fontFamily: "monospace" }}>
-                            {formattedBalance}
-                            </b>
-                        </div>
-                        );
-                    })
-                )
-            ) : (
-                <span style={{ ...styles.label, color: "#ef4444", fontWeight: "lighter", fontSize: "9px" }}>NO WALLET DETECTED</span>
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ 
+            display: "flex", 
+            justifyContent: "space-between", 
+            alignItems: "center",
+            marginBottom: "12px" 
+          }}>
+            <span style={{ color: "#666", fontSize: "10px", letterSpacing: "1px", fontWeight: "lighter" }}>
+              ACCOUNT BALANCES
+            </span>
+            {isConnected && balances?.length > 0 && (
+              <button 
+                onClick={() => setIsAssetModalOpen(true)}
+                style={{
+                  background: "rgba(1, 41, 12, 0.4)",
+                  border: "1px solid #01290c8e",
+                  color: "#1d5c34",
+                  fontSize: "9px",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  textTransform: "uppercase"
+                }}
+              >
+                Expand ↗
+              </button>
             )}
-        </div>
+          </div>
+
+          {/* CONDENSED SIDEBAR PREVIEW */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {isConnected ? (
+              (!balances || !Array.isArray(balances) || balances.length === 0) ? (
+                <div style={{ color: "#555", fontStyle: "italic", fontSize: "11px" }}>No positive balances found...</div>
+              ) : (
+                // Only map top 3 assets as a quick glance in the sidebar
+                balances.slice(0, 3).map((token, index) => (
+                  <div key={index} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
+                    <span style={{ color: "#aaa" }}>{token?.symbol || "UNKNOWN"}</span>
+                    <span style={{ ...styles.label, color: "#666" }}>
+                      {/* Ultra aggressive truncation for sidebar safety */}
+                      {token?.balance ? (Number(token.balance) / Math.pow(10, token?.decimals || 18)).toFixed(2) : "0.00"}
+                    </span>
+                  </div>
+                ))
+              )
+            ) : (
+              <span style={{ ...styles.label, color: "#ef4444", fontWeight: "lighter", fontSize: "9px" }}>NO WALLET DETECTED</span>
+            )}
+          </div>
         </div>
 
         <hr style={styles.divider} />
@@ -1341,6 +1317,186 @@ export default function Sidebar({
                 However, attempting to submit asset purchases or obtaining settlement credits <b style={{ color: "#8b2424", fontWeight: "500" }}>will fail </b> without an active account verified and processed by BG Company.
                 </p>
             </div>
+            )}
+            {/* EXPANDED ASSET POSITION PORTAL */}
+            {isAssetModalOpen && (
+              <div style={modalStyles.overlay}>
+                <div style={{ 
+                  ...modalStyles.content, 
+                  backgroundColor: "#0a0a0a", 
+                  border: "1px solid #161616", 
+                  padding: "32px",
+                  maxWidth: "750px",
+                  display: "flex",          // Set vertical layout order for the whole modal window
+                  flexDirection: "column"
+                }}>
+                  
+                  {/* 1. HEADER MATRIX (Strict horizontal split for title and close button) */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                    <div>
+                      <h3 style={{ margin: 0, color: "#fff", fontSize: "16px", fontWeight: "600", letterSpacing: "1px" }}>
+                        CURRENCY PORTFOLIO
+                      </h3>
+                      <p style={{ margin: "4px 0 0 0", color: "#666", fontSize: "11px" }}>
+                        Real-time balance breakdown across supported networks
+                      </p>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setIsAssetModalOpen(false)} 
+                      style={{ ...modalStyles.closeButton, color: "#666", fontSize: "24px", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  {/* 2. ARCHITECTURAL LIMITATION BANNER (Moved outside the header so it gets full grid real estate) */}
+                  <div style={{
+                    margin: "0 0 24px 0",
+                    padding: "16px",
+                    backgroundColor: "rgba(1, 41, 12, 0.15)",
+                    border: "1px solid rgba(1, 41, 12, 0.4)",
+                    borderRadius: "6px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "14px"
+                  }}>
+                    {/* TOP BLOCK: Notice Text */}
+                    <div style={{ 
+                      display: "flex", 
+                      flexDirection: "column", 
+                      gap: "4px",
+                      textAlign: "center"
+                    }}>
+                      <span style={{ color: "#1d5c34", fontSize: "11px", fontWeight: "600", letterSpacing: "0.5px" }}>
+                        SUPPORTED NETWORKS NOTICE
+                      </span>
+                      <span style={{ color: "#888", fontSize: "10px", lineHeight: "1.4" }}>
+                        Balance validation engines are currently hard-locked to verified execution layers.
+                      </span>
+                    </div>
+                    
+                    {/* BOTTOM BLOCK: Centered Tiles */}
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "center", 
+                      alignItems: "center", 
+                      gap: "6px",
+                      width: "100%"
+                    }}>
+                      {[ "global", "ethereum", "polygon" ].map((chain) => (
+                        <span key={chain} style={{
+                          fontSize: "10px",
+                          textTransform: "uppercase",
+                          color: chain === "global" ? "#1d5c34" : "#ffffff",
+                          backgroundColor: "#111111",
+                          border: chain === "global" ? "1px solid rgba(52, 211, 153, 0.3)" : "1px solid #222222",
+                          padding: "5px 12px",
+                          borderRadius: "4px",
+                          letterSpacing: "0.5px"
+                        }}>
+                          {chain}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3. MATRIX TABLE HEADER */}
+                  <div style={{ 
+                    display: "grid", 
+                    gridTemplateColumns: "120px 140px 1fr", 
+                    padding: "0 8px 10px 8px", 
+                    borderBottom: "1px solid #222", 
+                    color: "#444", 
+                    fontSize: "10px", 
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px"
+                  }}>
+                    <div>Network</div>
+                    <div>Currency</div>
+                    <div style={{ textAlign: "right" }}>Liquid Balance</div>
+                  </div>
+
+                  {/* 4. EXPANDED DATA LIST STACK */}
+                  <div style={{ maxHeight: "400px", overflowY: "auto", marginTop: "8px" }}>
+                    {balances.map((token, index) => {
+                      const rawBalance = token?.balance || "0";
+                      const decimals = typeof token?.decimals === "number" ? token.decimals : 18; 
+                      const symbol = token?.symbol || "UNKNOWN";
+                      const chain = token?.chain || "network";
+                      const address = token?.address || "";
+                      
+                      let formattedBalance = "0.0000";
+                      try {
+                        if (typeof rawBalance === 'string' && rawBalance.length > 15) {
+                          const pad = rawBalance.padStart(decimals + 1, '0');
+                          const splitIdx = pad.length - decimals;
+                          const whole = pad.slice(0, splitIdx);
+                          const fraction = pad.slice(splitIdx, splitIdx + 4); 
+                          formattedBalance = `${Number(whole).toLocaleString()}.${fraction}`;
+                        } else {
+                          formattedBalance = (Number(rawBalance) / Math.pow(10, decimals)).toFixed(4);
+                        }
+                      } catch (e) {
+                        formattedBalance = "0.0000";
+                      }
+
+                      return (
+                        <div 
+                          key={index} 
+                          style={{ 
+                            display: "grid", 
+                            gridTemplateColumns: "120px 140px 1fr", 
+                            alignItems: "center", 
+                            padding: "12px 8px", 
+                            borderBottom: "1px solid #111",
+                            background: index % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)"
+                          }}
+                        >
+                          {/* CHAIN NETWORK */}
+                          <div style={{ display: "flex" }}>
+                            <span style={{ 
+                              color: chain === "global" ? "#1d5c34" : "#1d5c34", 
+                              fontSize: "9px", 
+                              textTransform: "uppercase", 
+                              backgroundColor: "rgba(52, 211, 153, 0.05)", 
+                              border: chain === "global" ? "1px solid rgba(52, 211, 153, 0.3)" : "1px solid rgba(52, 211, 153, 0.1)",
+                              padding: "2px 6px", 
+                              borderRadius: "4px",
+                              fontWeight: "bold"
+                            }}>
+                              {chain}
+                            </span>
+                          </div>
+
+                          {/* TOKEN SYMBOL & ADDRESS TIP */}
+                          <div style={{ display: "flex", flexDirection: "column" }}>
+                            <span style={{ color: "#fff", fontSize: "13px", fontWeight: "600" }}>{symbol}</span>
+                            {address && (
+                              <span style={{ ...styles.label, color: "#444", fontSize: "9px" }}>
+                                {`${address.slice(0, 6)}...${address.slice(-4)}`}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* UNCONSTRAINED MASSIVE BALANCE */}
+                          <div style={{ 
+                            textAlign: "right", 
+                            fontFamily: "Courier New, Courier", 
+                            fontSize: "15px", 
+                            fontWeight: "600", 
+                            color: "#ffffff" 
+                          }}>
+                            {formattedBalance}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             )}
         </div>
     </aside>
