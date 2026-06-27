@@ -889,24 +889,28 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
           <div style={modalStyles.content} onClick={(e) => e.stopPropagation()}>
             <div style={{ ...styles.sectionCard, width: "100%", boxSizing: "border-box", margin: 0, border: "none" }}>
               
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #141414", paddingBottom: "8px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", marginBottom: "16px" }}>
                 <h2 style={{ ...styles.sectionTitle, margin: 0 }}>CORE PORTFOLIO DEPOSIT PIPELINE</h2>
                 <button style={modalStyles.closeButton} onClick={() => setIsDepositModalOpen(false)}>✕</button>
+              </div>
+              {/* NEW ETCHED HORIZONTAL DIVIDER (Using your exact opacity weight) */}
+              <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "0px", margin: "0 0 40px 0" }}>
+                <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
               </div>
 
               {/* INTERACTION SELECTOR MATRIX */}
               <div style={{ marginBottom: "16px" }}>
-                <label style={styles.label}>SELECT DEPOSIT CONTRACT METHOD TARGET</label>
+                <label style={styles.label}>INVESTMENT DEPOSIT CONTRACT TYPE</label>
                 <select style={styles.inputElement} value={depositType} onChange={(e) => setDepositType(e.target.value)}>
-                  <option value="SMART_VAULT" style={{ background: "#121212" }}>Smart Vault Deposit (Lock Quarters Execution)</option>
-                  <option value="VENTURE_VAULT" style={{ background: "#121212" }}>Venture Vault Deposit (Direct Asset Routing)</option>
+                  <option value="SMART_VAULT" style={{ background: "#121212" }}>Smart Vault Deposit (Dividend Investing)</option>
+                  <option value="VENTURE_VAULT" style={{ background: "#121212" }}>Venture Vault Deposit (Venture Based Investing)</option>
                 </select>
               </div>
               
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", alignItems: "start" }}>
                 {/* LEFT COLUMN */}
                 <div>
-                  <label style={styles.label}>USER ADDRESS</label>
+                  <label style={styles.label}>USER WALLET ADDRESS</label>
                   <input
                     type="text"
                     placeholder="0x..."
@@ -936,7 +940,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
                   </div>
 
                   <div style={{ marginTop: "12px" }}>
-                    <label style={styles.label}>DEPOSIT AMOUNT (UINT256)</label>
+                    <label style={styles.label}>DEPOSIT AMOUNT</label>
                     <input type="text" inputMode="decimal" placeholder="Enter raw token units" style={styles.inputElement} value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
                   </div>
                 </div>
@@ -970,12 +974,12 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
                   )}
 
                   <div style={{ marginTop: "12px" }}>
-                    <label style={styles.label}>DEPOSIT RECORD HASH (BYTES32)</label>
+                    <label style={styles.label}>DEPOSIT TRANSACTION HASH</label>
                     <input type="text" placeholder="0x..." style={{ ...styles.inputElement, fontFamily: "monospace" }} value={depositHash} onChange={(e) => setDepositHash(e.target.value)} />
                   </div>
 
                   <div style={{ marginTop: "12px" }}>
-                    <label style={{ ...styles.label, color: "#888" }}>INCOMING RATE INDEX</label>
+                    <label style={{ ...styles.label, color: "#888" }}>EXCHANGE RATE</label>
                     <input type="text" disabled style={{ ...styles.inputElement, color: "#555" }} value="System Handled (Passed at Call Execution)" />
                   </div>
                 </div>
@@ -987,7 +991,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
                   onClick={handleExecuteDeposit} 
                   disabled={depositLoading || !depositToken || (depositType === "VENTURE_VAULT" && !depositVentureAddress)}
                 >
-                  {depositLoading ? "SUBMITTING DEPOSIT ROUTINE..." : "EXECUTE DEPOSIT"}
+                  {depositLoading ? "SUBMITTING DEPOSIT..." : "EXECUTE DEPOSIT"}
                 </button>
               </div>
 
@@ -1002,17 +1006,21 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
           <div style={modalStyles.content} onClick={(e) => e.stopPropagation()}>
             <div style={{ ...styles.sectionCard, width: "100%", boxSizing: "border-box", margin: 0, border: "none" }}>
               
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #141414", paddingBottom: "8px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", marginBottom: "16px" }}>
                 <h2 style={{ ...styles.sectionTitle, margin: 0 }}>PORTFOLIO ASSET SETTLEMENT & WITHDRAWAL</h2>
                 <button style={modalStyles.closeButton} onClick={() => setIsWithdrawModalOpen(false)}>✕</button>
+              </div>
+              {/* NEW ETCHED HORIZONTAL DIVIDER (Using your exact opacity weight) */}
+              <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "0px", margin: "0 0 40px 0" }}>
+                <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
               </div>
 
               {/* INTERACTION SELECTOR MATRIX */}
               <div style={{ marginBottom: "16px" }}>
-                <label style={styles.label}>SELECT MATRIX CONTRACT TYPE</label>
+                <label style={styles.label}>INVESTMENT CONTRACT TYPE</label>
                 <select style={styles.inputElement} value={withdrawType} onChange={(e) => { setWithdrawType(e.target.value); setTargetVaultOrDividendToken(""); }}>
-                  <option value="SMART_VAULT" style={{ background: "#121212" }}>Smart Vault Framework (Dividend Asset Settlement)</option>
-                  <option value="VENTURE_VAULT" style={{ background: "#121212" }}>Venture Vault Framework (Infrastructure Settle)</option>
+                  <option value="SMART_VAULT" style={{ background: "#121212" }}>Smart Vault (Dividend Asset Settlement)</option>
+                  <option value="VENTURE_VAULT" style={{ background: "#121212" }}>Venture Vault (Infrastructure Settle)</option>
                 </select>
               </div>
 
@@ -1065,7 +1073,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
                   <input type="text" placeholder="Enter total asset validation balance" style={styles.inputElement} value={holderBalance} onChange={(e) => setHolderBalance(e.target.value)} />
                   
                   <div style={{ marginTop: "12px" }}>
-                    <label style={styles.label}>SYSTEM TIMESTAMP (GENERIC LOG)</label>
+                    <label style={styles.label}>SYSTEM TIMESTAMP</label>
                     <input type="text" disabled style={{ ...styles.inputElement, color: "#666" }} value="Auto-generated on runtime signature" />
                   </div>
                 </div>

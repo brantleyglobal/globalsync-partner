@@ -328,10 +328,10 @@ export default function PartnerPortal({
               ...styles.sectionCard, 
               width: "100%", 
               maxWidth: "680px", 
-              maxHeight: "calc(100vh - 40px)", // 🔥 Fixed: Ensures the card has visual clearance from the viewport border
+              maxHeight: "calc(100vh - 40px)",
               overflowY: "auto", 
               position: "relative", 
-              padding: "20px", // Increased inner padding slightly for structural balance
+              padding: "20px",
               background: "#0d0d0d", 
               border: "1px solid #1a1a1a", 
               boxShadow: "0px 12px 40px rgba(0,0,0,0.7)" 
@@ -339,7 +339,7 @@ export default function PartnerPortal({
             onClick={(e) => e.stopPropagation()} 
           >
             {/* CLOSE CONTROLLER ACTION */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1px solid #161616", paddingBottom: "12px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px", paddingBottom: "8px" }}>
               <h3 style={{ ...styles.sectionTitle, margin: 0, letterSpacing: "1px" }}>ASSET PURCHASE MANAGEMENT</h3>
               <button 
                 onClick={() => setIsPurchaseModalOpen(false)}
@@ -349,6 +349,10 @@ export default function PartnerPortal({
               >
                 ✕
               </button>
+            </div>
+            {/* NEW ETCHED HORIZONTAL DIVIDER (Using your exact opacity weight) */}
+            <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "0px", margin: "0 0 40px 0" }}>
+              <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
             </div>
 
             {/* ASSET CONFIGURATION LAYER */}

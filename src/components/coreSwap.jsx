@@ -322,9 +322,12 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
       <div style={modalStyles.overlay} onClick={() => setIsEscrowModalOpen(false)}>
         <div style={modalStyles.content} onClick={(e) => e.stopPropagation()}>
         <div style={{ ...styles.sectionCard, width: "100%", boxSizing: "border-box", margin: 0, border: "none" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #141414", paddingBottom: "8px", marginBottom: "16px" }}>
-            <h2 style={{ ...styles.sectionTitle, margin: 0 }}>XCHANGE ESCROW CREATION</h2>
-            <button style={modalStyles.closeButton} onClick={() => setIsEscrowModalOpen(false)}>✕</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", marginBottom: "8px" }}>
+              <h2 style={{ ...styles.sectionTitle, margin: 0 }}>XCHANGE ESCROW CREATION</h2>
+              <button style={modalStyles.closeButton} onClick={() => setIsEscrowModalOpen(false)}>✕</button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "0px", margin: "0 0 40px 0" }}>
+              <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
             </div>
             
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", alignItems: "start" }}>
@@ -434,9 +437,12 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
       <div style={modalStyles.overlay} onClick={() => setIsDepositModalOpen(false)}>
         <div style={modalStyles.content} onClick={(e) => e.stopPropagation()}>
         <div style={{ ...styles.sectionCard, width: "100%", boxSizing: "border-box", margin: 0, border: "none" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #141414", paddingBottom: "8px", marginBottom: "16px" }}>
-            <h2 style={{ ...styles.sectionTitle, margin: 0 }}>XCHANGE UPDATE</h2>
-            <button style={modalStyles.closeButton} onClick={() => setIsDepositModalOpen(false)}>✕</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", marginBottom: "8px" }}>
+              <h2 style={{ ...styles.sectionTitle, margin: 0 }}>XCHANGE UPDATE</h2>
+              <button style={modalStyles.closeButton} onClick={() => setIsDepositModalOpen(false)}>✕</button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "0px", margin: "0 0 40px 0" }}>
+              <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
             </div>
 
             {/* ROW 1: 2 Inputs */}
@@ -456,7 +462,7 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
             <div>
                 <label style={styles.label}>SELECT UPDATE TYPE</label>
                 <select style={styles.inputElement} value={selectedAction} onChange={(e) => setSelectedAction(e.target.value)}>
-                <option value="DEPOSIT" style={{ background: "#121212" }}>Xchange Deposit</option>
+                <option value="DEPOSIT" style={{ background: "#121212" }}>XChange Deposit</option>
                 <option value="REFUND" style={{ background: "#121212" }}>Refund / Cancellation</option>
                 </select>
             </div>
