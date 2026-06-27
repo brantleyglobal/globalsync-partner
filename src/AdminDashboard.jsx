@@ -920,7 +920,7 @@ export default function AdminDashboard() {
               </div>
               <span style={{ color: "#8d8d8d", fontSize: "10px" }}>
                 NODE STABILITY: {' '}
-                {latency === 0 ? (
+                {latency < 1 ? (
                   <span style={{ color: "#555" }}>OFFLINE</span>
                 ) : latency < 100 ? (
                   <span style={{ color: "#22c55e" }}>OPTIMAL</span>
