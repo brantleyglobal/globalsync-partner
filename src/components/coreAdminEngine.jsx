@@ -201,7 +201,7 @@ export default function CoreAdminEngine({
             </select>
 
             <button style={styles.btnForestGreen} onClick={handleVerifyDeposit}>
-              RUN VERIFICATION
+              SUBMIT VERIFICATION
             </button>
           </div>
         </div>
@@ -282,7 +282,7 @@ export default function CoreAdminEngine({
             />
 
             <button style={styles.btnForestGreen} onClick={handleSwapQuery}>
-              QUERY ATTESTATION INDEX
+              QUERY XCHANGE
             </button>
           </div>
         </div> {/* END RIGHT BLOCK */}
