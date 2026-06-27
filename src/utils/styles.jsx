@@ -3,15 +3,20 @@
 export const styles = {
   // GLOBAL LAYOUT CONFIGURATIONS
   appContainer: {
-    display: "flex",
-    minHeight: "100vh",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    display: "flex",              // Kept flex so sidebar and main content align horizontally
+    width: "100%",
+    minWidth: "1280px",           // THE FIX: Keeps the layout rigid so text never wraps when resizing
+    height: "100vh",              // Locks the application window frame container to the viewport
     background: "#000000",
     color: "#ffffff",
-    overflow: "hidden"
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    overflowX: "auto",            // Handles the window getting too small by scrolling smoothly (VS Code style)
+    overflowY: "hidden",          // Prevents the entire outer frame from scrolling vertically
+    boxSizing: "border-box"
   },
   sidebar: {
     width: "300px",
+    flexShrink: 0,
     background: "#01290c8e",
     borderRight: "1px solid #1a1a1a",
     padding: "30px 24px",

@@ -35,6 +35,7 @@ export default function PartnerPortal({
   setSelectedCountryKey,
   selectedStableTokenSymbol,
   setSelectedStableTokenSymbol,
+  setSelectedTokenAddress,
   firstname,
   setFirstname,
   lastname,

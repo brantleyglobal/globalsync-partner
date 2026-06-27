@@ -349,13 +349,19 @@ export default function AdminDashboard() {
       console.log(`Executing pre-flight receipt window validation against Treasury: ${targetTreasuryVault}`);
 
       let tokenConversionRate; 
+      const { rates, gbdoRate } = await getExchangeRates();
       try {
-        const rateData = await getExchangeRates();
+
+        const gbdo = Number(gbdoRate);
+        if (!isFinite(gbdo) || gbdo <= 0) {
+          throw new Error(`Invalid GBDO rate: ${gbdoRate}`);
+        }
+
         const paymentTokenSymbol = selectedStableTokenSymbol; 
 
         if (paymentTokenSymbol && paymentTokenSymbol.toUpperCase() !== "GBDO") {
           // Strict lookup against your already-guarded rates array
-          const rateEntry = rateData.rates.find(
+          const rateEntry = rates.rates.find(
             (r) => r.symbol === paymentTokenSymbol
           );
           
@@ -363,7 +369,7 @@ export default function AdminDashboard() {
             tokenConversionRate = Number(rateEntry.rate);
           } else {
             // If this logs, the symbol in your state doesn't match the symbol in your rates array
-            console.error(`[Lookup Error] Could not find match for "${paymentTokenSymbol}" in rates pool:`, rateData.rates.map(r => r.symbol));
+            console.error(`[Lookup Error] Could not find match for "${paymentTokenSymbol}" in rates pool:`, rates.rates.map(r => r.symbol));
           }
         }
       } catch (e) {
@@ -371,7 +377,7 @@ export default function AdminDashboard() {
       }
 
       const targetDecimalsBase18 = 18;
-      const expectedTokensHuman = (Number(humanTotalDollars) || 0) / tokenConversionRate;
+      const expectedTokensHuman = (Number(humanTotalDollars) || 0) * (tokenConversionRate / gbdoRate);
       
       const safeFixedString = expectedTokensHuman.toFixed(18).replace(/e[-+]\d+/, (match) => {
         return Number(match).toFixed(18).split('e')[0];
@@ -456,9 +462,8 @@ export default function AdminDashboard() {
 
     let activeExchangeRateBigInt = ethers.parseUnits("1.0", 18);
     try {
-      const rateData = await getExchangeRates();
       const selectedTokenSymbol = selectedStableTokenSymbol || "USDT"; 
-      const matchedToken = rateData.rates.find(
+      const matchedToken = rate.rates.find(
         (r) => r.symbol.toUpperCase() === selectedTokenSymbol.toUpperCase()
       );
 
@@ -676,8 +681,97 @@ export default function AdminDashboard() {
     return latency;
   };
 
+  const [gbdoRate, setGbdoRate] = useState(null);
+  const [ratesPool, setRatesPool] = useState([]);
+  const [activeRateIndex, setActiveRateIndex] = useState(0);
+
+  useEffect(() => {
+    const fetchMatrixPool = async () => {
+      try {
+        // Destructure directly from the utility response
+        const { rates, gbdoRate: incomingGbdoRate } = await getExchangeRates();
+        
+        const parsedGbdo = Number(incomingGbdoRate);
+        setGbdoRate(parsedGbdo);
+
+        if (Array.isArray(rates)) {
+
+          const allowedTokens = [ "COPX", "ETH", "LINK", "UNI", "MATIC", "GBDo", "GBDO" ];
+          const filteredRates = rates.filter(token => 
+            !allowedTokens.includes(token.symbol.toUpperCase())
+          );
+
+          const formattedArray = filteredRates.map(token => {
+            const symbol = token.symbol.toUpperCase();
+            const tokenRate = Number(token.rate);
+            
+            // Preserves your strict arithmetic conversion calculation
+            const calculatedRate = (tokenRate / parsedGbdo).toFixed(4);
+            // Result example: $3000.00 WETH/GBDo
+            return `$${Number(calculatedRate).toFixed(2)} ${symbol}/GBDo`;
+          });
+
+          setRatesPool(formattedArray);
+        }
+      } catch (error) {
+        console.error("Failed to parse global exchange metrics:", error);
+        setRatesPool(["Matrix Rates Unavailable"]);
+      }
+    };
+
+    fetchMatrixPool();
+  }, []);
+
+  // Hook 2: Rotate the visible index every 3 seconds
+  useEffect(() => {
+    if (ratesPool.length <= 1) return;
+
+    const rotationTimer = setInterval(() => {
+      setActiveRateIndex((prevIndex) => (prevIndex + 1) % ratesPool.length);
+    }, 3000);
+
+    return () => clearInterval(rotationTimer);
+  }, [ratesPool]);
+
   // 2. SECOND, call the hook using your endpoint configuration
   const latency = useRpcLatency("https://rpc.brantley-global.com");
+
+  const [isAdminUser, setIsAdminUser] = useState(false);
+
+  useEffect(() => {
+    const verifyAdminPrivileges = async () => {
+      // Ensure you have a valid provider/signer instance from your wallet connection
+      if (!walletAddress || !deployments.AssetPurchase) {
+        setIsAdminUser(false);
+        return;
+      }
+
+      try {
+        // Instantiating contract instance using standard Read/View configurations
+        const contractAbi = ["function adminsIndex() external view returns(address[] memory)"];
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        
+        const contractInstance = new ethers.Contract(
+          deployments.AssetPurchase, 
+          contractAbi, 
+          signer
+        );
+
+        // Attempt execution. If msg.sender is not an admin, this will throw an error/revert
+        await contractInstance.adminsIndex();
+        
+        // If no revert occurred, authentication passed successfully
+        setIsAdminUser(true);
+      } catch (authError) {
+        // Smoothly catch the NotAuthorized() revert profile without crashing the UI
+        console.warn("Administrative access check failed or user is not authorized.", authError.message);
+        setIsAdminUser(false);
+      }
+    };
+
+    verifyAdminPrivileges();
+  }, [walletAddress]);
 
   return (
   <div style={styles.appContainer}>
@@ -847,15 +941,51 @@ export default function AdminDashboard() {
           </div>
 
           {/* CORE MATRIX INTERFACES GRID */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", fontSize: "9px" }}>
             
             {[
-              { id: 'admin', title: 'ADMINISTRATIVE DASHBOARD', desc: 'Settlements, system audits, and deposits.', label: 'CORE_ENGINE', val: 'SECURE' },
-              { id: 'wholesale', title: 'WHOLESALER MATRIX', desc: 'Track inventory purchases and corporate credits.', label: 'CUMULATIVE_VOLUME', val: !isConnected && wholesaleTotal ? `$${wholesaleTotal}` : "0" },
-              { id: 'investments', title: 'INVESTOR MATRIX', desc: 'Portfolio view and execution dashboard.', label: 'OUTSTANDING', val: !isConnected && portfolioTotal ? portfolioTotal : "0.00 GBDo"},
-              { id: 'gateway', title: 'GLOBAL DOLLAR GATEWAY', desc: 'Liquidity flow configurations and exchanges.', label: 'GATEWAY_ROUTER', val: 'ACTIVE' },
-              { id: 'swap', title: 'GLOBAL XCHANGE MATRIX', desc: 'Escrowed swap executions and counterparties.', label: 'ESCROW_SYSTEM', val: 'STABLE' },
-              { id: 'affiliate', title: 'AFFILIATE MATRIX', desc: 'Performance analytics and distribution loops.', label: 'COMMISSIONS', val: `${(!isConnected && affiliateTotal) ? `$${String(affiliateTotal).trim()}` : "0.00"} GBDo` }
+              { 
+                id: 'admin', 
+                title: 'ADMINISTRATIVE DASHBOARD', 
+                desc: 'Settlements, system audits, and deposits.', 
+                label: 'CORE_ENGINE', 
+                val: !walletAddress ? 'DISCONNECTED' : (isAdminUser ? 'ACCESS_GRANTED' : 'RESTRICTED')
+              },
+              { 
+                id: 'wholesale', 
+                title: 'WHOLESALER MATRIX', 
+                desc: 'Track inventory purchases and corporate credits.', 
+                label: 'CUMULATIVE_VOLUME', 
+                val: !isConnected && wholesaleTotal ? `$${wholesaleTotal}` : "0" 
+              },
+              { 
+                id: 'investments', 
+                title: 'INVESTOR MATRIX', 
+                desc: 'Portfolio view and execution dashboard.', 
+                label: 'OUTSTANDING', 
+                val: !isConnected && portfolioTotal ? portfolioTotal : "0.00 GBDo"
+              },
+              { 
+                id: 'gateway', 
+                title: 'GLOBAL DOLLAR GATEWAY', 
+                desc: 'Liquidity flow configurations and exchanges.', 
+                label: 'GATEWAY_ROUTER',
+                val: ratesPool.length > 0 ? ratesPool[activeRateIndex] : 'Loading Matrix Pool...'
+              },
+              { 
+                id: 'swap', 
+                title: 'GLOBAL XCHANGE MATRIX', 
+                desc: 'Escrowed swap executions.', 
+                label: 'ESCROW_SYSTEM', 
+                val: latency === 0 ? 'OFFLINE' : latency < 100 ? 'OPTIMAL' : latency <= 250 ? 'STABLE' : 'DEGRADED'
+              },
+              { 
+                id: 'affiliate', 
+                title: 'AFFILIATE MATRIX', 
+                desc: 'Performance analytics and distribution loops.', 
+                label: 'COMMISSIONS', 
+                val: `${(!isConnected && affiliateTotal) ? `$${String(affiliateTotal).trim()}` : "0.00"} GBDo` 
+              }
             ].map((m) => (
               <div 
                 key={m.id}

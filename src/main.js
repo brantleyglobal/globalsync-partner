@@ -58,6 +58,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 1200,   // Prevents crushing the layout past your breaking points
+    minHeight: 600,
     icon: iconPath, 
     show: false, // Hidden in memory
     backgroundColor: '#000000', 
@@ -1420,7 +1422,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       const customizationCost = BigInt(customizationUpcharges || 0);
       const configsBytes32 = hardwareConfigBytes32; // Pre-packed config string from frontend
       const quantity = BigInt(quantity); // Default to single item purchase or pull dynamically
-      const exchangeRate = BigInt(1); // Set conversion multiplier baseline
+      const exchangeRate = BigInt(exchangeRate); // Set conversion multiplier baseline
       const commissionAmount = BigInt(0);
       const regionId = BigInt(0); // Map destination region identifier if tracked on-chain
       const purchaseTimeStamp = BigInt(Math.floor(Date.now() / 1000));
