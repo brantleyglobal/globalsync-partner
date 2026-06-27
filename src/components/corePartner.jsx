@@ -306,20 +306,16 @@ export default function PartnerPortal({
           style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}
           onClick={() => setIsPurchaseModalOpen(false)}
         >
-          {/* CSS Style Injection tag to style your scrollbar inline cleanly */}
+          {/* Replace your old CSS Style Injection tag with this: */}
           <style>{`
+            .custom-modal-scroll {
+              -ms-overflow-style: none;  /* IE and Edge */
+              scrollbar-width: none;     /* Firefox */
+            }
             .custom-modal-scroll::-webkit-scrollbar {
-              width: 6px;
-            }
-            .custom-modal-scroll::-webkit-scrollbar-track {
-              background: #0a0a0a;
-            }
-            .custom-modal-scroll::-webkit-scrollbar-thumb {
-              background: #222;
-              border-radius: 4px;
-            }
-            .custom-modal-scroll::-webkit-scrollbar-thumb:hover {
-              background: #1d5c34;
+              display: none;             /* Chrome, Safari, and Opera */
+              width: 0 !important;
+              height: 0 !important;
             }
           `}</style>
 
