@@ -105,7 +105,7 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
     try {
       let records = null;
       try {
-        // FIXED: Point to the new single IPC handler mapping
+        // Point to the new single IPC handler mapping
         const response = await window.electronAPI.swapRegistry({
           action: "GET_HISTORY",
           contractAddress: deployments.GlobalSwapRegistry, 
@@ -142,7 +142,6 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
             : "0xNone",
           offered: `${formatAllocation(BigInt(rec.amountA || 0))} ${rec.symbolA || 'Tokens'}`,
           requested: `${formatAllocation(BigInt(rec.amountB || 0))} ${rec.symbolB || 'Tokens'}`,
-          // FIXED: Leverage the true descriptive status label calculated directly by your backend
           statusLabel: rec.statusLabel.toUpperCase() 
         };
       });
@@ -181,17 +180,17 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
       const rawAmountA = toOnChainWeiString(amountA);
       const rawAmountB = toOnChainWeiString(amountB);
 
-      // FIXED: Swapped out legacy deployment signature for unified handler payload
+      // Swapped out legacy deployment signature for unified handler payload
       const response = await window.electronAPI.swapRegistry({
         action: "CREATE_SWAP",
         contractAddress: deployments.GlobalSwapRegistry,
         partyA: partyA.trim(),
         partyB: partyB.trim(),
         tokenA: tokenA.trim(),
-        amountA: rawAmountA, // <-- FIXED: Sends clean 18-decimal string (e.g. "1000000000000000000")
+        amountA: rawAmountA,
         partyADepositHash: sanitizeBytes32(partyADepositHash),
         tokenB: tokenB.trim(),
-        amountB: rawAmountB, // <-- FIXED: Sends clean 18-decimal string (e.g. "55000000000000000000")
+        amountB: rawAmountB,
         partyBDepositHash: sanitizeBytes32(partyBDepositHash)
       });
 
@@ -220,7 +219,7 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
     setActionFeedback(null);
 
     try {
-      // FIXED: Formatted object schema to pass expected parameters down to unified handler
+      
       const response = await window.electronAPI.swapRegistry({
         action: selectedAction.toUpperCase(), // "DEPOSIT" or "REFUND"
         contractAddress: deployments.GlobalSwapRegistry,
@@ -321,113 +320,113 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
       {isEscrowModalOpen && (
       <div style={modalStyles.overlay} onClick={() => setIsEscrowModalOpen(false)}>
         <div style={modalStyles.content} onClick={(e) => e.stopPropagation()}>
-        <div style={{ ...styles.sectionCard, width: "100%", boxSizing: "border-box", margin: 0, border: "none" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", marginBottom: "8px" }}>
-              <h2 style={{ ...styles.sectionTitle, margin: 0 }}>XCHANGE ESCROW CREATION</h2>
-              <button style={modalStyles.closeButton} onClick={() => setIsEscrowModalOpen(false)}>✕</button>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "0px", margin: "0 0 40px 0" }}>
-              <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
-            </div>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", alignItems: "start" }}>
-            {/* LEFT SUB-GRID: PARTY A COMPONENT */}
-            <div style={{ borderRight: "1px solid #141414", paddingRight: "20px" }}>
-            <label style={styles.label}>PARTY A WALLET ADDRESS</label>
-            <input type="text" placeholder="0x..." style={styles.inputElement} value={partyA} onChange={(e) => setPartyA(e.target.value)} />
+          <div style={{ ...styles.sectionCard, width: "100%", boxSizing: "border-box", margin: 0, border: "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", marginBottom: "8px" }}>
+                <h2 style={{ ...styles.sectionTitle, margin: 0 }}>XCHANGE ESCROW CREATION</h2>
+                <button style={modalStyles.closeButton} onClick={() => setIsEscrowModalOpen(false)}>✕</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "0px", margin: "0 0 40px 0" }}>
+                <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
+              </div>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", alignItems: "start" }}>
+                {/* LEFT SUB-GRID: PARTY A COMPONENT */}
+                <div style={{ borderRight: "1px solid #141414", paddingRight: "20px" }}>
+                  <label style={styles.label}>PARTY A WALLET ADDRESS</label>
+                  <input type="text" placeholder="0x..." style={styles.inputElement} value={partyA} onChange={(e) => setPartyA(e.target.value)} />
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "10px" }}>
-                <div>
-                <label style={styles.label}>ASSET SELECTION</label>
-                <select 
-                    style={styles.inputElement} 
-                    value={tokenA} 
-                    onChange={(e) => setTokenA(e.target.value)}
-                >
-                    <option value="" disabled style={{ background: "#121212" }}> Token Asset</option>
-                    {mergedTokens.map((token) => (
-                    <option key={`tokenA-${token.address}`} value={token.address} style={{ background: "#121212" }}>
-                        {token.symbol} ({token.name || token.chain})
-                    </option>
-                    ))}
-                </select>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "10px" }}>
+                      <div>
+                        <label style={styles.label}>ASSET SELECTION</label>
+                        <select 
+                            style={styles.inputElement} 
+                            value={tokenA} 
+                            onChange={(e) => setTokenA(e.target.value)}
+                        >
+                            <option value="" disabled style={{ background: "#121212" }}> Token Asset</option>
+                            {mergedTokens.map((token) => (
+                            <option key={`tokenA-${token.address}`} value={token.address} style={{ background: "#121212" }}>
+                                {token.symbol} ({token.name || token.chain})
+                            </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div>
+                          <label style={styles.label}>AMOUNT</label>
+                          <input
+                              type="text"
+                              inputMode="decimal"
+                              pattern="[0-9]*"
+                              placeholder="Pledged Amount"
+                              style={styles.inputElement} // Keeping your global styles architecture
+                              value={amountA}
+                              onChange={(e) => {
+                              const formatted = formatMoneyFromDigits(e.target.value);
+                              setAmountA(formatted);
+                              }}
+                          />
+                      </div>
+                  </div>
+
+                  <div style={{ marginTop: "10px" }}>
+                      <label style={{ ...styles.label, color: "#888" }}>PARTY DEPOSIT TRANSACTION HASH</label>
+                      <input type="text" placeholder="0x... (Optional for creation)" style={{ ...styles.inputElement }} value={partyADepositHash} onChange={(e) => setPartyADepositHash(e.target.value)} />
+                  </div>
                 </div>
+
+                {/* RIGHT SUB-GRID: PARTY B COMPONENT */}
                 <div>
-                    <label style={styles.label}>AMOUNT</label>
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        pattern="[0-9]*"
-                        placeholder="Pledged Amount"
-                        style={styles.inputElement} // Keeping your global styles architecture
-                        value={amountA}
-                        onChange={(e) => {
-                        const formatted = formatMoneyFromDigits(e.target.value);
-                        setAmountA(formatted);
-                        }}
-                    />
+                  <label style={styles.label}>PARTY B WALLET ADDRESS</label>
+                  <input type="text" placeholder="0x..." style={styles.inputElement} value={partyB} onChange={(e) => setPartyB(e.target.value)} />
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "10px" }}>
+                      <div>
+                        <label style={styles.label}>ASSET SELECTION</label>
+                        <select 
+                            style={styles.inputElement} 
+                            value={tokenB} 
+                            onChange={(e) => setTokenB(e.target.value)}
+                        >
+                            <option value="" disabled style={{ background: "#121212" }}>Token Asset</option>
+                            {mergedTokens
+                            .filter((token) => !["BTC", "COPx", "CGRi"].includes(token.symbol))
+                            .map((token) => (
+                            <option key={`tokenB-${token.address}`} value={token.address} style={{ background: "#121212" }}>
+                                {token.symbol} ({token.name || token.chain})
+                            </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div>
+                          <label style={styles.label}>AMOUNT</label>
+                          <input
+                              type="text"
+                              inputMode="decimal"
+                              pattern="[0-9]*"
+                              placeholder="Pledged Amount"
+                              style={styles.inputElement}
+                              value={amountB}
+                              onChange={(e) => {
+                              const formatted = formatMoneyFromDigits(e.target.value);
+                              setAmountB(formatted);
+                              }}
+                          />
+                      </div>
+                  </div>
+
+                  <div style={{ marginTop: "10px" }}>
+                      <label style={{ ...styles.label, color: "#888" }}>PARTY DEPOSIT TRANSACTION HASH</label>
+                      <input type="text" placeholder="0x... (Optional for creation)" style={{ ...styles.inputElement }} value={partyBDepositHash} onChange={(e) => setPartyBDepositHash(e.target.value)} />
+                  </div>
                 </div>
-            </div>
+              </div>
 
-            <div style={{ marginTop: "10px" }}>
-                <label style={{ ...styles.label, color: "#888" }}>PARTY DEPOSIT TRANSACTION HASH</label>
-                <input type="text" placeholder="0x... (Optional for creation)" style={{ ...styles.inputElement }} value={partyADepositHash} onChange={(e) => setPartyADepositHash(e.target.value)} />
-            </div>
-            </div>
-
-            {/* RIGHT SUB-GRID: PARTY B COMPONENT */}
-            <div>
-            <label style={styles.label}>PARTY B WALLET ADDRESS</label>
-            <input type="text" placeholder="0x..." style={styles.inputElement} value={partyB} onChange={(e) => setPartyB(e.target.value)} />
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "10px" }}>
-                <div>
-                <label style={styles.label}>ASSET SELECTION</label>
-                <select 
-                    style={styles.inputElement} 
-                    value={tokenB} 
-                    onChange={(e) => setTokenB(e.target.value)}
-                >
-                    <option value="" disabled style={{ background: "#121212" }}>Token Asset</option>
-                    {mergedTokens
-                    .filter((token) => !["BTC", "COPx", "CGRi"].includes(token.symbol))
-                    .map((token) => (
-                    <option key={`tokenB-${token.address}`} value={token.address} style={{ background: "#121212" }}>
-                        {token.symbol} ({token.name || token.chain})
-                    </option>
-                    ))}
-                </select>
-                </div>
-                <div>
-                    <label style={styles.label}>AMOUNT</label>
-                    <input
-                        type="text"
-                        inputMode="decimal"
-                        pattern="[0-9]*"
-                        placeholder="Pledged Amount"
-                        style={styles.inputElement}
-                        value={amountB}
-                        onChange={(e) => {
-                        const formatted = formatMoneyFromDigits(e.target.value);
-                        setAmountB(formatted);
-                        }}
-                    />
-                </div>
-            </div>
-
-            <div style={{ marginTop: "10px" }}>
-                <label style={{ ...styles.label, color: "#888" }}>PARTY DEPOSIT TRANSACTION HASH</label>
-                <input type="text" placeholder="0x... (Optional for creation)" style={{ ...styles.inputElement }} value={partyBDepositHash} onChange={(e) => setPartyBDepositHash(e.target.value)} />
-            </div>
-            </div>
-            </div>
-
-            <div style={{ marginTop: "20px", borderTop: "1px solid #141414", paddingTop: "16px", display: "flex", justifyContent: "flex-end" }}>
-            <button style={{ ...styles.btnForestGreen, width: "auto", paddingLeft: "32px", paddingRight: "32px" }} onClick={handleDeployEscrow} disabled={createLoading || !isConnected}>
-                {createLoading ? "CREATING XCHANGE ESCROW..." : "SUBMIT XCHANGE"}
-            </button>
-            </div>
-        </div>
+              <div style={{ marginTop: "20px", borderTop: "1px solid #141414", paddingTop: "16px", display: "flex", justifyContent: "flex-end" }}>
+                <button style={{ ...styles.btnForestGreen, width: "auto", paddingLeft: "32px", paddingRight: "32px" }} onClick={handleDeployEscrow} disabled={createLoading || !isConnected}>
+                    {createLoading ? "CREATING XCHANGE ESCROW..." : "SUBMIT XCHANGE"}
+                </button>
+              </div>
+          </div>
         </div>
       </div>
       )}

@@ -483,174 +483,6 @@ ipcMain.handle('blockchain:get-balances', async (event, userAddress) => {
 });
 
 // ========================================================
-// XCHANGE HANDLER
-// ========================================================
-
-ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
-
-  const REGISTRY_ABI = [
-    "function swapRegistry(address) external view returns (address swapAddress, address partyA, address partyB, address tokenA, address tokenB, uint256 amountA, uint256 amountB, uint8 status)",
-    "function getSwapsForUser(address user) external view returns (address[] memory)",
-    "function createNewSwap(address partyA, address partyB, address tokenA, uint256 amountA, bytes32 partyADepositHash, address tokenB, uint256 amountB, bytes32 partyBDepositHash) external returns (address)",
-    "function deposit(address swapAddress, address party, bytes32 depositHash) external",
-    "function refund(address swapAddress, address party, bytes32 refundHash) external",
-    "function markPartyAPayoutCompleted(address swapAddress) external",
-    "function markPartyBPayoutCompleted(address swapAddress) external"
-  ];
-
-  const CLONE_INSTANCE_ABI = [
-    "function partyADeposited() external view returns (bool)",
-    "function partyBDeposited() external view returns (bool)",
-    "function payoutACompleted() external view returns (bool)",
-    "function payoutBCompleted() external view returns (bool)"
-  ];
-
-  const REGISTRY_STATUS_LABELS = {
-    0: "PendingDeposits", 1: "PartyADeposited", 2: "PartyBDeposited", 3: "Completed",
-    4: "PartyAPayoutDone", 5: "PartyBPayoutDone", 6: "FullySettled",
-    7: "PartyARefunded", 8: "PartyBRefunded", 9: "FullyRefunded"
-  };
-
-  try {
-    const { action, contractAddress, userAddress } = payload;
-
-    // --- SUB-ROUTINE 1: FETCH HISTORY ---
-    if (action === "GET_HISTORY") {
-      const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, providers.globalChain);
-      const cloneAddresses = await registryContract.getSwapsForUser(userAddress);
-      const historyRecords = [];
-
-      for (let i = 0; i < cloneAddresses.length; i++) {
-        const swapAddr = cloneAddresses[i];
-        const structDetails = await registryContract.swapRegistry(swapAddr);
-        
-        // Inspect individual lifecycle flags inside the unique instance clone
-        const instanceContract = new ethers.Contract(swapAddr, CLONE_INSTANCE_ABI, providers.globalChain);
-        let partyAClosed = false;
-        let partyBClosed = false;
-
-        try {
-          const [pA_Done, pB_Done, pA_Dep, pB_Dep] = await Promise.all([
-            instanceContract.payoutACompleted(),
-            instanceContract.payoutBCompleted(),
-            instanceContract.partyADeposited(),
-            instanceContract.partyBDeposited()
-          ]);
-          partyAClosed = pA_Done || pA_Dep;
-          partyBClosed = pB_Done || pB_Dep;
-        } catch (err) {
-          // Fallback if the clone instance is uninitialized or empty
-        }
-
-        const tokenAMatch = supportedTokens.find(t => t.address.toLowerCase() === structDetails.tokenA.toLowerCase());
-        const tokenBMatch = supportedTokens.find(t => t.address.toLowerCase() === structDetails.tokenB.toLowerCase());
-
-        // Push the cleaned record directly to the frontend array
-        historyRecords.push({
-          id: `${swapAddr}-${i}`,
-          cloneAddress: swapAddr,
-          partyA: structDetails.partyA,
-          partyB: structDetails.partyB,
-          tokenA: structDetails.tokenA,
-          tokenB: structDetails.tokenB,
-          amountA: structDetails.amountA.toString(), 
-          amountB: structDetails.amountB.toString(),
-          status: Number(structDetails.status),
-          statusLabel: REGISTRY_STATUS_LABELS[Number(structDetails.status)] || "Unknown",
-          partyAClosed,
-          partyBClosed,
-          
-          // If found in your array, use its true symbol. Otherwise, fall back gracefully.
-          symbolA: tokenAMatch ? tokenAMatch.symbol : "UNKNOWN",
-          symbolB: tokenBMatch ? tokenBMatch.symbol : "UNKNOWN"
-        });
-      }
-      return { success: true, data: historyRecords };
-    }
-
-    // --- PROTECTED ADMIN ROUTINES ---
-    // Enforce active wallet validation matching your system's design
-    if (!activeAdminSession || !activeAdminSession.isConnected) {
-      return { success: false, error: "Session missing. Please re-authenticate your admin wallet credentials." };
-    }
-    const adminSigner = new ethers.Wallet(activeAdminSession.secret, providers.globalChain);
-    const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, adminSigner);
-    const sheild = new ethers.Contract(deployments.GlobalSheild, REGISTRY_ABI, adminSigner);
-    const ts = Math.floor(Date.now() / 1000);
-
-    // --- SUB-ROUTINE 2: DEPLOY NEW ESCROW ---
-    if (action === "CREATE_SWAP") {
-      const tx = await registryContract.createSwap(
-        payload.partyA,
-        payload.partyB,
-        payload.tokenA,
-        payload.amountA, 
-        payload.partyADepositHash,
-        payload.tokenB,
-        payload.amountB,
-        payload.partyBDepositHash,
-        ts
-      );
-      const receipt = await tx.wait(1);
-      return { success: true, txHash: receipt.hash };
-    }
-
-    // --- SUB-ROUTINE 3: DEPOSIT STEP ---
-    if (action === "DEPOSIT") {
-      const tx = await sheild.deposit(payload.targetSwapAddress, userAddress, payload.clearingHash, ts);
-      const receipt = await tx.wait(1);
-      return { success: true, txHash: receipt.hash };
-    }
-
-    // --- SUB-ROUTINE 4: REFUND STEP ---
-    if (action === "REFUND") {
-      const tx = await sheild.refund(payload.targetSwapAddress, userAddress, payload.clearingHash);
-      const receipt = await tx.wait(1);
-      return { success: true, txHash: receipt.hash };
-    }
-
-    return { success: false, error: `Action variants matching request [${action}] unmapped.` };
-
-  } catch (error) {
-    console.error("Custom swap registry handler threw execution exception:", error);
-    return { success: false, error: error.reason || error.message };
-  }
-});
-
-// ========================================================
-// AFFILIATE HANDLER
-// ========================================================
-
-// Inside main.js
-ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, contractAddress, chainKey }) => {
-  if (!userAddress || !contractAddress) return [];
-
-  try {
-    // Verified ABI configuration layout matching struct array return definitions
-    const affiliateAbi = [
-      "function getAffiliateHistory(address user) view returns (tuple(address user, uint256 purchaseIndex, uint256 commission, string commissionHash)[])"
-    ];
-    
-    // Explicit contract instantiation inside secure desktop node container
-    const contract = new ethers.Contract(contractAddress, affiliateAbi, providers.globalChain);
-
-    const records = await contract.getAffiliateHistory(userAddress);
-    
-    // Safely normalize raw big integers into strings before streaming across IPC lanes
-    return (records || []).map(rec => ({
-      user: rec.user,
-      purchaseIndex: rec.purchaseIndex.toString(),
-      commission: rec.commission.toString(),
-      commissionHash: rec.commissionHash
-    }));
-
-  } catch (error) {
-    console.error("Backend affiliate log fetch failed:", error);
-    throw error; 
-  }
-});
-
-// ========================================================
 // PARTNER HANDLER
 // ========================================================
 
@@ -901,28 +733,29 @@ ipcMain.handle('submitDeposit', async (event, payload) => {
 
       // Invoke overloaded Smart Vault layout function explicitly
       const depositFn = mainContract["vaultDeposit(uint256,address,address,uint256,uint256,uint256,bytes32)"];
-      const tx1 = await mainContract.ventureDeposit(
-        payload.timeStamp,
-        payload.user,
-        payload.token,
-        payload.venture,
-        payload.amount,
-        payload.incomingRate,
-        payload.depositHash
+      tx = await depositFn(
+        BigInt(timeStamp),
+        userAddress,
+        tokenAddress,
+        parsedAmount,
+        parsedQuarters,
+        parsedRate,
+        formattedHash
       );
+      
     } else {
       console.log(`[Electron Backend] Executing Venture Vault Deposit for user: ${userAddress}`);
       
-      // Invoke overloaded Venture Vault layout function explicitly
       const depositFn = mainContract["ventureDeposit(uint256,address,address,address,uint256,uint256,bytes32)"];
-      const tx2 = await mainContract.vaultDeposit(
-        payload.timeStamp,
-        payload.investor,
-        payload.token,
-        payload.amount,
-        payload.committedQuarters,
-        payload.incomingRate,
-        payload.depositHash
+      
+      tx = await depositFn(
+        BigInt(timeStamp),
+        userAddress,
+        tokenAddress,
+        ventureAddress,
+        parsedAmount,
+        parsedRate,
+        formattedHash
       );
     }
 
@@ -963,12 +796,15 @@ ipcMain.handle('submitWithdrawal', async (event, payload) => {
     return { status: "Error", error: `Signer hydration failed: ${err.message}` };
   }
 
-  const targetContractAddress = deployments.GlobalSheild;
+  const vaultContractAddress = deployments.SmartVault;
+  const ventureContractAddress = deployments.RegionInfrastructure;
   console.log(`Executing Withdrawal execution vector utilizing signer: ${signer.address}`);
-  const mainContract = new ethers.Contract(targetContractAddress, CONTRACT_ABI, signer);
+  const vaultContract = new ethers.Contract(vaultContractAddress, CONTRACT_ABI, signer);
+  const ventureContract = new ethers.Contract(ventureContractAddress, CONTRACT_ABI, signer);
 
   try {
     const {
+      withdrawType,
       targetAddress,       // maps dynamically to dividendToken or venture address
       payToken,            // token payout channel address
       holderBalance,       // raw validation asset account metrics string
@@ -981,12 +817,21 @@ ipcMain.handle('submitWithdrawal', async (event, payload) => {
 
     // Dynamic execution of universal matching function template
     // Signature: withdraw(address,address,uint256,uint256)
-    const tx = await mainContract.withdraw(
-      targetAddress,
-      payToken,
-      parsedBalance,
-      BigInt(timeStamp)
-    );
+    if (withdrawType === SMART_VAULT) {
+      const tx = await vaultContract.withdraw(
+        targetAddress,
+        payToken,
+        parsedBalance,
+        BigInt(timeStamp)
+      );
+    } else {
+      const tx = await ventureContract.withdraw(
+        targetAddress,
+        payToken,
+        parsedBalance,
+        BigInt(timeStamp)
+      );
+    }
 
     console.log(`[Withdrawal Transaction Broadcasted] Hash: ${tx.hash}`);
     const receipt = await tx.wait();
@@ -1070,7 +915,7 @@ ipcMain.handle('submit-acquisition', async (event, payload) => {
       currentTxTime,
       depositHash
     );
-
+    
     console.log(`[Transaction Broadcasted] Hash: ${tx.hash}`);
     const receipt = await tx.wait(); // Wait for block confirmation
 
@@ -1122,18 +967,26 @@ ipcMain.handle('submit-user-liquidate', async (event, payload) => {
   const mainContract = new ethers.Contract(deployments.AcquisitionGateway, contractABI, signer);
 
   try {
-    const { payoutTokenAddress, amountToCashOut } = payload;
+    const { 
+      userAddress,
+      tokenAddress,
+      amountIn,
+      amountOut,
+      exchangeRate,
+      depositHash 
+    } = payload;
+
     const timeStamp = Math.floor(Date.now() / 1000);
 
     // Parse user numeric parameters securely
-    const parsedAmount = ethers.parseUnits(amountToCashOut.toString(), 18);
+    const parsedAmount = ethers.parseUnits(amountIn.toString(), 18);
 
-    console.log(`[Electron Backend] Processing public liquidation queue for ${amountToCashOut} tokens...`);
+    console.log(`[Electron Backend] Processing public liquidation queue for ${amountIn} tokens...`);
 
     // Sends the transaction directly to your liquidated code block structure
     const tx = await mainContract.liquidate(
-      payoutTokenAddress,
-      parsedAmount,
+      tokenAddress,
+      BigInt(parsedAmount),
       timeStamp
     );
 
@@ -1209,8 +1062,10 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
     const {
       // Query parameters
       modeArg,
-      contractAddress,
+      contractArg,
       txType,
+      dateArgs,
+      contractAddress,
       args,
       userAddress,
       limit,
@@ -1218,18 +1073,23 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       custodialWallet,
 
       // State-change specific parameters
-      cryptoAuth,
+      buyerWalletAddress,
+      selectedTokenAddress,
+      transactionType,
       assetId,
       basePrice,
-      shippingTransitDays,
       customizationUpcharges,
+      shippingTransitDays,
+      quantity,
+      totalBaseDays,
+      exchangeRate,
       hardwareConfigBytes32,
-      selectedTokenAddress,
-      buyerWalletAddress,
+      custodialDepositHash,
       configurationSummary,
-      custodialDepositHash
+      destinationCountry,
+      cryptoAuth
     } = payload;
-
+    
     // --- MODE 1: TIMESTAMP QUERY ---
     if (modeArg === "timestamp-query") {
       const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, providers.globalChain);
@@ -1496,8 +1356,192 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
   }
 });
 
+
+// ========================================================
+// AFFILIATE HANDLER
+// ========================================================
+
+// Inside main.js
+ipcMain.handle('blockchain:get-affiliate-history', async (event, { userAddress, contractAddress, chainKey }) => {
+  if (!userAddress || !contractAddress) return [];
+
+  try {
+    // Verified ABI configuration layout matching struct array return definitions
+    const affiliateAbi = [
+      "function getAffiliateHistory(address user) view returns (tuple(address user, uint256 purchaseIndex, uint256 commission, string commissionHash)[])"
+    ];
+    
+    // Explicit contract instantiation inside secure desktop node container
+    const contract = new ethers.Contract(contractAddress, affiliateAbi, providers.globalChain);
+
+    const records = await contract.getAffiliateHistory(userAddress);
+    
+    // Safely normalize raw big integers into strings before streaming across IPC lanes
+    return (records || []).map(rec => ({
+      user: rec.user,
+      purchaseIndex: rec.purchaseIndex.toString(),
+      commission: rec.commission.toString(),
+      commissionHash: rec.commissionHash
+    }));
+
+  } catch (error) {
+    console.error("Backend affiliate log fetch failed:", error);
+    throw error; 
+  }
+});
+
 // ========================================================
 // XCHANGE HANDLER
+// ========================================================
+
+ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
+
+  const REGISTRY_ABI = [
+    "function swapRegistry(address) external view returns (address swapAddress, address partyA, address partyB, address tokenA, address tokenB, uint256 amountA, uint256 amountB, uint8 status)",
+    "function getSwapsForUser(address user) external view returns (address[] memory)",
+    "function createNewSwap(address partyA, address partyB, address tokenA, uint256 amountA, bytes32 partyADepositHash, address tokenB, uint256 amountB, bytes32 partyBDepositHash) external returns (address)",
+    "function deposit(address swapAddress, address party, bytes32 depositHash) external",
+    "function refund(address swapAddress, address party, bytes32 refundHash) external",
+    "function markPartyAPayoutCompleted(address swapAddress) external",
+    "function markPartyBPayoutCompleted(address swapAddress) external"
+  ];
+
+  const CLONE_INSTANCE_ABI = [
+    "function partyADeposited() external view returns (bool)",
+    "function partyBDeposited() external view returns (bool)",
+    "function payoutACompleted() external view returns (bool)",
+    "function payoutBCompleted() external view returns (bool)"
+  ];
+
+  const REGISTRY_STATUS_LABELS = {
+    0: "PendingDeposits", 1: "PartyADeposited", 2: "PartyBDeposited", 3: "Completed",
+    4: "PartyAPayoutDone", 5: "PartyBPayoutDone", 6: "FullySettled",
+    7: "PartyARefunded", 8: "PartyBRefunded", 9: "FullyRefunded"
+  };
+
+  try {
+
+    const {
+      action,
+      contractAddress,
+      partyA,
+      partyB,
+      tokenA,
+      amountA,
+      partyADepositHash,
+      tokenB,
+      amountB,
+      partyBDepositHash,
+      targetSwapAddress,
+      userAddress,
+      clearingHash
+    } = payload;
+
+    // --- SUB-ROUTINE 1: FETCH HISTORY ---
+    if (action === "GET_HISTORY") {
+      const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, providers.globalChain);
+      const cloneAddresses = await registryContract.getSwapsForUser(userAddress);
+      const historyRecords = [];
+
+      for (let i = 0; i < cloneAddresses.length; i++) {
+        const swapAddr = cloneAddresses[i];
+        const structDetails = await registryContract.swapRegistry(swapAddr);
+        
+        // Inspect individual lifecycle flags inside the unique instance clone
+        const instanceContract = new ethers.Contract(swapAddr, CLONE_INSTANCE_ABI, providers.globalChain);
+        let partyAClosed = false;
+        let partyBClosed = false;
+
+        try {
+          const [pA_Done, pB_Done, pA_Dep, pB_Dep] = await Promise.all([
+            instanceContract.payoutACompleted(),
+            instanceContract.payoutBCompleted(),
+            instanceContract.partyADeposited(),
+            instanceContract.partyBDeposited()
+          ]);
+          partyAClosed = pA_Done || pA_Dep;
+          partyBClosed = pB_Done || pB_Dep;
+        } catch (err) {
+          // Fallback if the clone instance is uninitialized or empty
+        }
+
+        const tokenAMatch = supportedTokens.find(t => t.address.toLowerCase() === structDetails.tokenA.toLowerCase());
+        const tokenBMatch = supportedTokens.find(t => t.address.toLowerCase() === structDetails.tokenB.toLowerCase());
+
+        // Push the cleaned record directly to the frontend array
+        historyRecords.push({
+          id: `${swapAddr}-${i}`,
+          cloneAddress: swapAddr,
+          partyA: structDetails.partyA,
+          partyB: structDetails.partyB,
+          tokenA: structDetails.tokenA,
+          tokenB: structDetails.tokenB,
+          amountA: structDetails.amountA.toString(), 
+          amountB: structDetails.amountB.toString(),
+          status: Number(structDetails.status),
+          statusLabel: REGISTRY_STATUS_LABELS[Number(structDetails.status)] || "Unknown",
+          partyAClosed,
+          partyBClosed,
+          
+          // If found in your array, use its true symbol. Otherwise, fall back gracefully.
+          symbolA: tokenAMatch ? tokenAMatch.symbol : "UNKNOWN",
+          symbolB: tokenBMatch ? tokenBMatch.symbol : "UNKNOWN"
+        });
+      }
+      return { success: true, data: historyRecords };
+    }
+
+    // --- PROTECTED ADMIN ROUTINES ---
+    // Enforce active wallet validation matching your system's design
+    if (!activeAdminSession || !activeAdminSession.isConnected) {
+      return { success: false, error: "Session missing. Please re-authenticate your admin wallet credentials." };
+    }
+    const adminSigner = new ethers.Wallet(activeAdminSession.secret, providers.globalChain);
+    const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, adminSigner);
+    const shield = new ethers.Contract(deployments.GlobalSheild, REGISTRY_ABI, adminSigner);
+    const ts = Math.floor(Date.now() / 1000);
+
+    // --- SUB-ROUTINE 2: DEPLOY NEW ESCROW ---
+    if (action === "CREATE_SWAP") {
+      const tx = await shield.createSwap(
+        partyA,
+        partyB,
+        tokenA,
+        amountA, 
+        partyADepositHash,
+        tokenB,
+        amountB,
+        partyBDepositHash,
+        ts
+      );
+      const receipt = await tx.wait(1);
+      return { success: true, txHash: receipt.hash };
+    }
+
+    // --- SUB-ROUTINE 3: DEPOSIT STEP ---
+    if (action === "DEPOSIT") {
+      const tx = await shield.deposit(targetSwapAddress, userAddress, clearingHash, ts);
+      const receipt = await tx.wait(1);
+      return { success: true, txHash: receipt.hash };
+    }
+
+    // --- SUB-ROUTINE 4: REFUND STEP ---
+    if (action === "REFUND") {
+      const tx = await shield.refund(targetSwapAddress, userAddress, clearingHash, ts);
+      const receipt = await tx.wait(1);
+      return { success: true, txHash: receipt.hash };
+    }
+
+    return { success: false, error: `Action variants matching request [${action}] unmapped.` };
+
+  } catch (error) {
+    console.error("Custom swap registry handler threw execution exception:", error);
+    return { success: false, error: error.reason || error.message };
+  }
+});
+
+// ========================================================
+// XCHANGE QUERY HANDLER
 // ========================================================
 
 ipcMain.handle('query-swap-registry', async (event, payload) => {

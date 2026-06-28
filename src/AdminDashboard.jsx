@@ -52,7 +52,7 @@ export default function AdminDashboard() {
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
 
-  const [pledgedToken, setPledgedToken] = useState("");
+  const [pledgedToken, setPledgedToken] = useState(null);
   const [pledgedAmount, setPledgedAmount] = useState("");
   const [exchangeRate, setExchangeRate] = useState("");
   const [convertedAmount, setConvertedAmount] = useState("");

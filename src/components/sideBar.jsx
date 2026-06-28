@@ -95,8 +95,8 @@ export default function Sidebar({
   const [depositHash, setDepositHash] = useState("");
 
   // Automatically resolves the hex contract address right before submitting 
-  const targetTokenObj = supportedTokens?.find(t => t.symbol === pledgedToken);
-  const tokenIdentifier = targetTokenObj?.address || pledgedToken;
+  const targetTokenObj = supportedTokens?.find(t => t.symbol === pledgedToken?.symbol);
+  const tokenIdentifier = targetTokenObj?.address || pledgedToken?.address;
 
   const handleNativePurchase = async () => {
     // 1. Guard check: Ensure wallet state context is bound
@@ -104,6 +104,8 @@ export default function Sidebar({
       alert("Please connect or enter a valid wallet address.");
       return;
     }
+
+    const cleanAmountString = pledgedAmount.replace(/,/g, '');
 
     // 2. Structural Guard: Reject empty requests before hitting the node pipeline
     const amountFloat = parseFloat(pledgedAmount);
@@ -119,11 +121,7 @@ export default function Sidebar({
 
     try {
       // Optional: Turn on busy states (e.g., setIsLoading(true))
-      console.log(`Initiating purchase for ${pledgedAmount} of token ${pledgedToken}...`);
-
-      // Calculate the expected GBDo output token metrics 
-      // formula: amountIn * exchangeRate (or your app's specific custom conversion logic)
-      const computedAmountOut = amountFloat / parseFloat(exchangeRate);
+      console.log(`Initiating purchase for ${pledgedAmount} of token ${pledgedToken.symbol}...`);
 
       // Generate a pseudo-random, unique tracking hash for the smart contract's replay guard
       // We append the timestamp to a standard 32-byte hex template string
@@ -143,28 +141,15 @@ export default function Sidebar({
         console.log(`Executing pre-flight receipt window validation against Treasury: ${targetTreasuryVault}`);
   
         let tokenConversionRate; 
-        try {
-          const rateData = await getExchangeRates();
-          const paymentTokenSymbol = pledgedToken.symbol; 
-  
-          if (paymentTokenSymbol && paymentTokenSymbol.toUpperCase() !== "GBDO") {
-            // Strict lookup against your already-guarded rates array
-            const rateEntry = rateData.rates.find(
-              (r) => r.symbol === paymentTokenSymbol
-            );
-            
-            if (rateEntry) {
-              tokenConversionRate = Number(rateEntry.rate);
-            } else {
-              // If this logs, the symbol in your state doesn't match the symbol in your rates array
-              console.error(`[Lookup Error] Could not find match for "${paymentTokenSymbol}" in rates pool:`, rateData.rates.map(r => r.symbol));
-            }
-          }
-        } catch (e) {
-          console.warn("Pre-flight bridge check failed to read exchangeData pool.", e);
-        }
+        let computedAmountOut;
   
         const targetDecimalsBase18 = 18;
+
+        if (transactionType === "deposit") {
+          computedAmountOut = amountFloat / parseFloat(exchangeRate);
+        } else {
+          computedAmountOut = amountFloat * parseFloat(exchangeRate);
+        }
         
         const safeFixedString = computedAmountOut.toFixed(18).replace(/e[-+]\d+/, (match) => {
           return Number(match).toFixed(18).split('e')[0];
@@ -185,60 +170,62 @@ export default function Sidebar({
         });
         console.groupEnd();
   
-        if (!depositHash) {
+        if (transactionType === "deposit" && !depositHash) {
           throw new Error("Missing Transaction Hash! You must provide the user's transaction payment hash.");
         }
-        if (!depositHash.startsWith("0x") || depositHash.length < 66) {
+        if (transactionType === "deposit" && !depositHash.startsWith("0x") || depositHash.length < 66) {
           throw new Error(`Invalid Hash Format! "${depositHash}" must be a 66-character hex string starting with 0x.`);
         }
   
         let verificationResponse = null;
   
         // --- THE SHIELD LAYER ---
-        try {
-          verificationResponse = await window.api.triggerVault({
-            modeArg: "verify-erc20-receipt",
-            transactionHash: depositHash,
-            custodialWallet: targetTreasuryVault 
-          });
-        } catch (ipcError) {
-          // Direct the technical background crash straight to the console log
-          console.error("IPC validation background pipe crashed:", ipcError);
-          
-          // Mock a clean rejection profile so the code handles it smoothly down below
-          verificationResponse = { ok: false, reason: "The verification server was unable to index the transaction. Please ensure it is confirmed on-chain." };
-        }
+        if (transactionType === "deposit") {
+          try {
+            verificationResponse = await window.api.triggerVault({
+              modeArg: "verify-erc20-receipt",
+              transactionHash: depositHash,
+              custodialWallet: targetTreasuryVault 
+            });
+          } catch (ipcError) {
+            // Direct the technical background crash straight to the console log
+            console.error("IPC validation background pipe crashed:", ipcError);
+            
+            // Mock a clean rejection profile so the code handles it smoothly down below
+            verificationResponse = { ok: false, reason: "The verification server was unable to index the transaction. Please ensure it is confirmed on-chain." };
+          }
   
-        if (!verificationResponse || !verificationResponse.ok) {
-          throw new Error(verificationResponse?.reason || "Receipt was not found on the blockchain indexer.");
-        }
-  
-        const rawLoggedTokenAmount = BigInt(verificationResponse.amount);
-        const actualDecimalsOfPaymentToken = verificationResponse.decimals ?? targetDecimals ?? 18;
-        const normalizedPaidAmountBase18 = BigInt(
-          rescaleAmount(rawLoggedTokenAmount, actualDecimalsOfPaymentToken, targetDecimalsBase18)
-        );
-  
-        console.log(`[AUDIT RECEIPT] Actual Payment Detected: ${ethers.formatUnits(normalizedPaidAmountBase18, 18)} Units`);
-  
-        if (verificationResponse.senderAddress.toLowerCase() !== targetUserWallet.toLowerCase()) {
-          throw new Error(
-            `Ownership Mismatch!\n` +
-            `• On-Chain Sender: ${verificationResponse.senderAddress.toLowerCase()}\n` +
-            `• Target State Wallet: ${targetUserWallet.toLowerCase()}`
+          if (!verificationResponse || !verificationResponse.ok) {
+            throw new Error(verificationResponse?.reason || "Receipt was not found on the blockchain indexer.");
+          }
+    
+          const rawLoggedTokenAmount = BigInt(verificationResponse.amount);
+          const actualDecimalsOfPaymentToken = verificationResponse.decimals ?? targetDecimals ?? 18;
+          const normalizedPaidAmountBase18 = BigInt(
+            rescaleAmount(rawLoggedTokenAmount, actualDecimalsOfPaymentToken, targetDecimalsBase18)
           );
+    
+          console.log(`[AUDIT RECEIPT] Actual Payment Detected: ${ethers.formatUnits(normalizedPaidAmountBase18, 18)} Units`);
+    
+          if (verificationResponse.senderAddress.toLowerCase() !== targetUserWallet.toLowerCase()) {
+            throw new Error(
+              `Ownership Mismatch!\n` +
+              `• On-Chain Sender: ${verificationResponse.senderAddress.toLowerCase()}\n` +
+              `• Target State Wallet: ${targetUserWallet.toLowerCase()}`
+            );
+          }
+    
+          if (normalizedPaidAmountBase18 < priceFloorBase18) {
+            const varianceBase18 = priceFloorBase18 - normalizedPaidAmountBase18;
+            throw new Error(
+              `Slippage Violation! The transacted amount is too low.\n` +
+              `• Required Floor: ${ethers.formatUnits(priceFloorBase18, 18)} tokens\n` +
+              `• Received Amount: ${ethers.formatUnits(normalizedPaidAmountBase18, 18)} tokens`
+            );
+          }
+    
+          console.log("Receipt Verification Passed. Moving smoothly to step 2...");
         }
-  
-        if (normalizedPaidAmountBase18 < priceFloorBase18) {
-          const varianceBase18 = priceFloorBase18 - normalizedPaidAmountBase18;
-          throw new Error(
-            `Slippage Violation! The transacted amount is too low.\n` +
-            `• Required Floor: ${ethers.formatUnits(priceFloorBase18, 18)} tokens\n` +
-            `• Received Amount: ${ethers.formatUnits(normalizedPaidAmountBase18, 18)} tokens`
-          );
-        }
-  
-        console.log("Receipt Verification Passed. Moving smoothly to step 2...");
   
       } catch (verifyError) {
         console.error("PRE-FLIGHT AUDIT REJECTION:", verifyError.message);
@@ -249,7 +236,7 @@ export default function Sidebar({
       // Construct the exact payload payload format expected by main.js
       const payload = {
         userAddress: userAddress,
-        tokenAddress: pledgedToken, // Assuming pledgedToken state holds the token contract address
+        tokenAddress: pledgedToken.address, // Assuming pledgedToken state holds the token contract address
         amountIn: pledgedAmount,
         amountOut: computedAmountOut.toString(),
         exchangeRate: exchangeRate.toString(),
@@ -257,7 +244,12 @@ export default function Sidebar({
       };
 
       // Invoke your secure preload contextBridge window method
-      const result = await window.electronAPI.submitAcquisition(payload);
+      let result;
+      if ( transactionType === "deposit") {
+        result = await window.electronAPI.submitAcquisition(payload);
+      } else {
+        result = await window.electronAPI.submitUserLiquidate(payload);
+      }
       
       // 7. Evaluate explicitly using a safe boolean evaluation
       if (result && result.success) {
@@ -269,7 +261,7 @@ export default function Sidebar({
         
         // Close out the toggle parameters to minimize cleartext remnants
         setPledgedAmount("");
-        setPledgedToken("");
+        setPledgedToken(null);
         if (typeof setIsOpen === "function") setIsOpen(false);
       } else {
         // Handle cases where the promise resolved but the backend script failed
@@ -321,7 +313,7 @@ export default function Sidebar({
       const requestId = Date.now();
   
       const fetchRate = async () => {
-        const symbol = String(pledgedToken || "").toUpperCase();
+        const symbol = String(pledgedToken?.symbol || "").toUpperCase();
         if (!symbol) return;
   
         try {
@@ -387,7 +379,7 @@ export default function Sidebar({
         // cancel any in-flight response from older selections
         cancelled = true;
       };
-    }, [pledgedToken]);
+    }, [pledgedToken?.symbol]);
   
     // Derive converted amount whenever depositAmount or exchangeRate changes
     useEffect(() => {
@@ -482,7 +474,7 @@ export default function Sidebar({
         {/* 1. SIGN-IN / CREDENTIALS DRAWER */}
         <div style={{ display: "flex", flexDirection: "column", fontFamily: "system-ui, sans-serif", margin: "0 12px 16px 12px" }}>
           <div 
-              onClick={() => (setShowAuthDrawer(!showAuthDrawer), setShowPurchaseDrawer(false))} 
+              onClick={() => (setShowAuthDrawer(!showAuthDrawer), setShowPurchaseDrawer(false), setIsOpen(false))} 
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -817,7 +809,7 @@ export default function Sidebar({
         {/* PURCHASE GBDo / NATIVE DRAWER */}
         <div style={{ display: "flex", flexDirection: "column", fontFamily: "system-ui, sans-serif", margin: "0 12px 16px 12px" }}>
           <div 
-              onClick={() => (setShowPurchaseDrawer(!showPurchaseDrawer), setShowAuthDrawer(false))} 
+              onClick={() => (setShowPurchaseDrawer(!showPurchaseDrawer), setShowAuthDrawer(false), setIsOpen(false))} 
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -910,8 +902,12 @@ export default function Sidebar({
                       
                       <select 
                         style={styles.inputElement} 
-                        value={pledgedToken}
-                        onChange={(e) => setPledgedToken(e.target.value)}
+                        value={pledgedToken ? pledgedToken.symbol : ""}
+                        onChange={(e) => {
+                          const selectedSymbol = e.target.value;
+                          const tokenObject = supportedTokens.find(t => t.symbol === selectedSymbol);
+                          setPledgedToken(tokenObject)
+                        }}
                       >
                         <option value="" disabled style={{ ...styles.inputElement, background: "#121212" }}>
                           Select {transactionType === "deposit" ? "Deposit" : "Withdrawal"} Asset
@@ -962,7 +958,7 @@ export default function Sidebar({
                           marginTop: "4px"
                         }}>
                           <span style={{ fontSize: "10px", color: "#555", fontWeight: "600", letterSpacing: "0.5px" }}>
-                            {transactionType === "deposit" ? "ESTIMATED GBDo" : `ESTIMATED ${pledgedToken || "NATIVE"}`}
+                            {transactionType === "deposit" ? "ESTIMATED GBDo" : `ESTIMATED ${pledgedToken.symbol || "NATIVE"}`}
                           </span>
                           <span style={{
                             ...styles.label,
@@ -982,11 +978,11 @@ export default function Sidebar({
                                 } else {
                                   // Cash Out: GBDo Amount / Rate = Native Token Returned
                                   const totalNative = amount * rate;
-                                  return `${totalNative.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ${pledgedToken}`;
+                                  return `${totalNative.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ${pledgedToken.symbol}`;
                                 }
                               }
                               
-                              return transactionType === "deposit" ? "0.00 GBDo" : `0.0000 ${pledgedToken || "Token"}`;
+                              return transactionType === "deposit" ? "0.00 GBDo" : `0.0000 ${pledgedToken.symbol || "Token"}`;
                             })()}
                           </span>
                         </div>
@@ -996,11 +992,10 @@ export default function Sidebar({
                           <div style={{ fontSize: "10px", color: "#666", margin: "2px 0 8px 4px", display: "flex", justifyContent: "space-between" }}>
                             <span>CONVERSION RATE:</span>
                             <span style={{ ...styles.label, color: "#aaa" }}>
-                              1 {pledgedToken} ≈ {isFinite(parseFloat(exchangeRate)) ? parseFloat(exchangeRate).toFixed(4) : "0.00"} GBDo
+                              1 {pledgedToken.symbol} ≈ {isFinite(parseFloat(exchangeRate)) ? parseFloat(exchangeRate).toFixed(4) : "0.00"} GBDo
                             </span>
                           </div>
                         )}
-                        
                       </div>
                     </div>
                   </div>
@@ -1070,6 +1065,9 @@ export default function Sidebar({
               onClick={() => {
                 setPortalView('admin'); 
                 setLastVisitedMatrix('admin');
+                setShowPurchaseDrawer(false);
+                setShowAuthDrawer(false);
+                setIsOpen(false);
                 localStorage.setItem('last_visited_matrix', 'admin');
                 
                 setRecentlyViewed(prev => {
@@ -1093,6 +1091,9 @@ export default function Sidebar({
               onClick={() => {
                 setPortalView('swap'); 
                 setLastVisitedMatrix('swap');
+                setShowPurchaseDrawer(false);
+                setShowAuthDrawer(false);
+                setIsOpen(false);
                 localStorage.setItem('last_visited_matrix', 'swap');
 
                 setRecentlyViewed(prev => {
@@ -1116,6 +1117,9 @@ export default function Sidebar({
               onClick={() => {
                 setPortalView('gateway'); 
                 setLastVisitedMatrix('gateway');
+                setShowPurchaseDrawer(false);
+                setShowAuthDrawer(false);
+                setIsOpen(false);
                 localStorage.setItem('last_visited_matrix', 'gateway');
 
                 setRecentlyViewed(prev => {
@@ -1139,6 +1143,9 @@ export default function Sidebar({
               onClick={() => {
                 setPortalView('affiliate'); 
                 setLastVisitedMatrix('affiliate');
+                setShowPurchaseDrawer(false);
+                setShowAuthDrawer(false);
+                setIsOpen(false);
                 localStorage.setItem('last_visited_matrix', 'affiliate');
 
                 setRecentlyViewed(prev => {
@@ -1162,6 +1169,9 @@ export default function Sidebar({
               onClick={() => {
                 setPortalView('wholesale'); 
                 setLastVisitedMatrix('wholesale');
+                setShowPurchaseDrawer(false);
+                setShowAuthDrawer(false);
+                setIsOpen(false);
                 localStorage.setItem('last_visited_matrix', 'wholesale');
 
                 setRecentlyViewed(prev => {
@@ -1185,6 +1195,9 @@ export default function Sidebar({
               onClick={() => {
                 setPortalView('investments'); 
                 setLastVisitedMatrix('investments');
+                setShowPurchaseDrawer(false);
+                setShowAuthDrawer(false);
+                setIsOpen(false);
                 localStorage.setItem('last_visited_matrix', 'investments');
 
                 setRecentlyViewed(prev => {
@@ -1220,7 +1233,7 @@ export default function Sidebar({
             </span>
             {isConnected && balances?.length > 0 && (
               <button 
-                onClick={() => setIsAssetModalOpen(true)}
+                onClick={() => (setIsAssetModalOpen(true), setShowAuthDrawer(false), setIsOpen(false), setShowPurchaseDrawer(false))}
                 style={{
                   background: "rgba(1, 41, 12, 0.4)",
                   border: "1px solid #01290c8e",
@@ -1271,7 +1284,7 @@ export default function Sidebar({
             fontFamily: "system-ui, -apple-system, sans-serif"
         }}>
             <div 
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => (setIsOpen(!isOpen), setShowPurchaseDrawer(false), setShowAuthDrawer(false))}
             style={{
                 display: "flex",
                 alignItems: "center",
