@@ -1397,7 +1397,7 @@ export default function Sidebar({
                       gap: "6px",
                       width: "100%"
                     }}>
-                      {[ "global", "ethereum", "polygon" ].map((chain) => (
+                      {[ "global", "ethereum", "polygon", "base" ].map((chain) => (
                         <span key={chain} style={{
                           fontSize: "10px",
                           textTransform: "uppercase",

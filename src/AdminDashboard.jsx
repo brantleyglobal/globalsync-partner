@@ -164,10 +164,10 @@ export default function AdminDashboard() {
     const endTs = getUnixTimestamp(endDate, true);
     
     const payload = {
-      contractArg: selectedContract,
+      contractAddress: selectedContract,
       modeArg: "timestamp-query",
       txType: selectedType,
-      dateArgs: [
+      args: [
         startTs,
         endTs,
         false
@@ -175,13 +175,30 @@ export default function AdminDashboard() {
     };
 
     console.log("Sending query to Electron backend:", payload);
-    const response = await window.api.triggerVault(payload);
 
-    if (response && response.status === "Success") {
-      setTimestampResults([response]);
-    } else {
-      setTimestampResults([{ error: "Failed to fetch data from backend" }]);
-    }1
+    try {
+
+      const apiBridge = window.electronAPI;
+
+      // Temporarily call it safely using optional chaining to see if the object itself is there
+      if (apiBridge && apiBridge.triggerVault) {
+          const response = await apiBridge.triggerVault(payload);
+          // ...
+      } else {
+          console.log("electronAPI exists, but triggerVault method isn't loaded. Relaunch Electron!");
+      }
+
+      const response = await apiBridge.triggerVault(payload);
+
+      if (response && response.status === "Success") {
+        setTimestampResults([response]);
+      } else {
+        setTimestampResults([{ error: response?.error || "Failed to fetch data from backend" }]);
+      }
+    } catch (error) {
+      console.error("Frontend IPC Error:", error);
+      setTimestampResults([{ error: error.message }]);
+    }
   };
 
   // -----------------------------

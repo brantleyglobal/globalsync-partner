@@ -409,7 +409,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
   };
 
   return (
-    <div style={styles.mainContent}>
+    <div style={{ ...styles.mainContent, scrollbarWidth: "thin" }}>
       {/* GLOBAL SESSION STATUS BAR */}
       <div style={{ display: "flex", flexDirection: "column", width: "100%", boxSizing: "border-box" }}>
         

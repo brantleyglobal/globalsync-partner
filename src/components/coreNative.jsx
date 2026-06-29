@@ -106,7 +106,7 @@ export default function NativeExchangeHistory({ userAddress, isConnected }) {
   }, [userAddress, isConnected]);
 
   return (
-    <div style={styles.mainContent}>
+    <div style={{ ...styles.mainContent, scrollbarWidth: "thin" }}>
       {/* GLOBAL SESSION STATUS BAR */}
       <div style={{ display: "flex", flexDirection: "column", width: "100%", boxSizing: "border-box" }}>
         

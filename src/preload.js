@@ -53,5 +53,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('secure-execute-transaction', txData),
 
   querySwapRegistry: (targetAddress) =>
-    ipcRenderer.invoke('query-swap-registry', targetAddress)
+    ipcRenderer.invoke('query-swap-registry', targetAddress),
+  
+  triggerVault: (payload) =>
+    ipcRenderer.invoke('trigger-vault', payload)
+
 });

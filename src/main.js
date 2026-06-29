@@ -55,7 +55,7 @@ function createWindow() {
   `);
 
   // 2. INITIALIZE YOUR MAIN WINDOW (Keep it completely hidden)
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 1200,   // Prevents crushing the layout past your breaking points
@@ -1095,7 +1095,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
     if (modeArg === "timestamp-query") {
       const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, providers.globalChain);
       let tx;
-      if (txType === "Deposit") {
+      if (txType.toUpperCase() === "DEPOSIT") {
         // Warning: if getDepositsInRange modifies state, use .staticCall to read without spending gas
         tx = await contract.getDepositsInRange.staticCall(args[0], args[1], args[2]);
       } else {
@@ -1109,7 +1109,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       const provider = providers.globalChain;
       const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, provider);
       
-      if (txType === "Deposit") {
+      if (txType.toUpperCase() === "DEPOSIT") {
         const count = await contract.getUserDepositCount(userAddress);
         const totalItems = Number(count);
         const fetchCount = Math.min(totalItems, limit);

@@ -68,7 +68,7 @@ export default function CoreAdminEngine({
   };
 
   return (
-    <main style={styles.mainContent}>
+    <main style={{ ...styles.mainContent, scrollbarWidth: "thin" }}>
       {/* GLOBAL SESSION STATUS BAR */}
       <div style={{ display: "flex", flexDirection: "column", width: "100%", boxSizing: "border-box" }}>
         
@@ -292,32 +292,59 @@ export default function CoreAdminEngine({
           BOTTOM ROW: UNIFIED LEDGER TELEMETRY TERMINAL (FULL-WIDTH DISPLAY OUT)
           ======================================================================= */}
       <div style={styles.sectionCard}>
+        <style dangerouslySetInnerHTML={{__html: `
+        .clean-scrollbar::-webkit-scrollbar { width: 4px !important; height: 6px !important; }
+        .clean-scrollbar::-webkit-scrollbar-track { background: transparent !important; }
+        .clean-scrollbar::-webkit-scrollbar-thumb { background: #333 !important; border-radius: 2px !important; }
+        .clean-scrollbar::-webkit-scrollbar-thumb:hover { background: #444 !important; }
+      `}} />
         <h2 style={styles.sectionTitle}>OUTPUT CONSOLE</h2>
-        <p style={{ color: "#555", fontSize: "11px", margin: "-10px 0 16px 0", letterSpacing: "0.5px" }}>
-        </p>
+        <p style={{ color: "#555", fontSize: "11px", margin: "-10px 0 16px 0", letterSpacing: "0.5px" }}></p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-          <div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", minWidth: 0 }}>
+          
+          <div style={{ minWidth: 0 }}>
             <span style={{ ...styles.label, fontSize: "10px", color: "#8d8d8d" }}>CORE SYSTEM | USER QUERY LOGS</span>
-            {/* CORE SYSTEM / USER QUERY LOGS */}
-            <pre style={{ ...styles.jsonDisplay, overflowX: "auto", maxHeight: "220px", marginTop: "6px", background: "#050505", border: "1px solid #222" }}>
+            <pre 
+            className="clean-scrollbar"
+            style={{ 
+              ...styles.jsonDisplay, 
+              overflowY: "auto", 
+              maxHeight: "220px", 
+              marginTop: "6px", 
+              background: "#050505", 
+              border: "1px solid #222",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+              overflowWrap: "break-word",
+              scrollbarWidth: "thin"
+            }}>
               {(() => {
-                // 1. Gather whatever active data exists
                 const activeData = timestampResults || userQueryResults;
-
-                // 2. If it doesn't exist, or if it is an empty array, render IDLE fallback
                 if (!activeData || (Array.isArray(activeData) && activeData.length === 0)) {
                   return JSON.stringify({ status: "IDLE", message: "Console pipeline open. Awaiting user telemetry inputs." }, null, 2);
                 }
-
-                // 3. Otherwise, safely stringify the actual matching ledger records
                 return JSON.stringify(activeData, null, 2);
               })()}
             </pre>
           </div>
-          <div>
+
+          <div style={{ minWidth: 0 }}>
             <span style={{ ...styles.label, fontSize: "10px", color: "#8d8d8d" }}>XCHANGE REGISTRY OUTPUTS</span>
-            <pre style={{ ...styles.jsonDisplay, overflowX: "auto", maxHeight: "220px", marginTop: "6px", background: "#050505", border: "1px solid #222" }}>
+            <pre 
+            className="clean-scrollbar"
+            style={{ 
+              ...styles.jsonDisplay, 
+              overflowY: "auto", 
+              maxHeight: "220px", 
+              marginTop: "6px", 
+              background: "#050505", 
+              border: "1px solid #222",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+              overflowWrap: "break-word",
+              scrollbarWidth: "thin"
+            }}>
               {JSON.stringify(swapQueryResults || { status: "IDLE", message: "XChange sub-matrix pipeline open. Awaiting hash target inputs." }, null, 2)}
             </pre>
           </div>
