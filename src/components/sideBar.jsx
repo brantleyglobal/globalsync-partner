@@ -79,7 +79,6 @@ export default function Sidebar({
   setExchangeRate,
   convertedAmount,
   setConvertedAmount,
-  purchaseNative,
   isConnected,
   onConnectWallet,
   onDisconnectWallet
@@ -199,7 +198,7 @@ export default function Sidebar({
             throw new Error(verificationResponse?.reason || "Receipt was not found on the blockchain indexer.");
           }
     
-          const rawLoggedTokenAmount = BigInt(verificationResponse.amount);
+          const rawLoggedTokenAmount = BigInt(verificationResponse.rawAmount);
           const actualDecimalsOfPaymentToken = verificationResponse.decimals ?? targetDecimals ?? 18;
           const normalizedPaidAmountBase18 = BigInt(
             rescaleAmount(rawLoggedTokenAmount, actualDecimalsOfPaymentToken, targetDecimalsBase18)
@@ -207,7 +206,7 @@ export default function Sidebar({
     
           console.log(`[AUDIT RECEIPT] Actual Payment Detected: ${ethers.formatUnits(normalizedPaidAmountBase18, 18)} Units`);
     
-          if (verificationResponse.senderAddress.toLowerCase() !== targetUserWallet.toLowerCase()) {
+          if (verificationResponse.senderAddress.toLowerCase() !== userAddress.toLowerCase()) {
             throw new Error(
               `Ownership Mismatch!\n` +
               `• On-Chain Sender: ${verificationResponse.senderAddress.toLowerCase()}\n` +

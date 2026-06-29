@@ -704,7 +704,7 @@ ipcMain.handle('submitDeposit', async (event, payload) => {
 
   // Bind execution client configuration deployment target
   // Ensure deployments.AcquisitionGateway or deployments.VaultManager target maps appropriately here
-  const targetContractAddress = deployments.GlobalSheild; 
+  const targetContractAddress = deployments.GlobalShield; 
   console.log(`Executing Deposit execution vector utilizing signer: ${signer.address}`);
   const mainContract = new ethers.Contract(targetContractAddress, CONTRACT_ABI, signer);
 
@@ -889,7 +889,7 @@ ipcMain.handle('submit-acquisition', async (event, payload) => {
   }
 
   console.log(`Executing contract state modification using signer: ${signer.address}`);
-  const mainContract = new ethers.Contract(deployments.GlobalSheild, CONTRACT_ABI, signer);
+  const mainContract = new ethers.Contract(deployments.GlobalShield, CONTRACT_ABI, signer);
 
   try {
     const { 
@@ -918,7 +918,7 @@ ipcMain.handle('submit-acquisition', async (event, payload) => {
       parsedRate,
       currentTxTime,
       depositHash,
-      { gasLimit: 150_000 }
+      { gasLimit: 300_000 }
     );
     
     console.log(`[Transaction Broadcasted] Hash: ${tx.hash}`);
@@ -1012,41 +1012,38 @@ ipcMain.handle('submit-user-liquidate', async (event, payload) => {
 ipcMain.handle('get-native-exchange-history', async (event, { userAddress }) => {
   try {
     const provider = providers.globalChain;
-    // We instantiate a generic provider read-only instance to maximize speed and bypass wallet locks
     const readContract = new ethers.Contract(deployments.AcquisitionGateway, CONTRACT_ABI, provider);
 
-    console.log(`[Electron Backend] Compiling exchange history for user: ${userAddress}`);
-
-    // 1. Fetch total transactions logged under the user profile
     const totalTermsBigInt = await readContract.getUserTermCount(userAddress);
     const totalTerms = Number(totalTermsBigInt);
 
-    const historyRecords = [];
-
-    // 2. Loop through tracking slots cleanly via open index view lookups
+    // 1. Pre-build array of read promises
+    const promises = [];
     for (let i = 0; i < totalTerms; i++) {
-      const p = await readContract.getUserTerm(userAddress, i);
-
-      // Map raw blockchain struct arrays into clean native JS data objects
-      historyRecords.push({
-        timestamp: Number(p.timestamp),
-        user: p.user,
-        token: p.token,
-        payoutSetter: p.payoutSetter,
-        refundSetter: p.refundSetter,
-        termIndex: Number(p.termIndex),
-        amountin: p.amountin.toString(),        // Lowercase to match your struct exactly
-        amountout: p.amountout.toString(),      // Lowercase to match your struct exactly
-        exchangeRate: p.exchangeRate.toString(),
-        purchaseTxHash: p.purchaseTxHash,
-        payoutTxHash: p.payoutTxHash,
-        refundHash: p.refundHash,
-        refund: p.refund,
-        credit: p.credit
-      });
+      promises.push(readContract.getUserTerm(userAddress, i));
     }
 
-    // Sort records sequentially (most recent transactions show first)
+    // 2. Resolve them all simultaneously in parallel!
+    const rawRecords = await Promise.all(promises);
+
+    // 3. Map into clean data structures
+    const historyRecords = rawRecords.map((p, index) => ({
+      timestamp: Number(p.timestamp),
+      user: p.user,
+      token: p.token,
+      payoutSetter: p.payoutSetter,
+      refundSetter: p.refundSetter,
+      termIndex: Number(p.termIndex ?? index),
+      amountin: p.amountin.toString(),
+      amountout: p.amountout.toString(),
+      exchangeRate: p.exchangeRate.toString(),
+      purchaseTxHash: p.purchaseTxHash,
+      payoutTxHash: p.payoutTxHash,
+      refundHash: p.refundHash,
+      refund: p.refund,
+      credit: p.credit?.toString()
+    }));
+
     return { 
       success: true, 
       records: historyRecords.sort((a, b) => b.timestamp - a.timestamp) 
@@ -1077,8 +1074,6 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       limit,
       transactionHash,
       custodialWallet,
-
-      // State-change specific parameters
       buyerWalletAddress,
       selectedTokenAddress,
       transactionType,
@@ -1109,33 +1104,57 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       return { status: "Success", data: tx };
     }
 
-    // --- MODE 2: MULTI-STEP USER LOOP ---
-    // Automates checking total count, verifying limit, and fetching array items loop in backend
+    // --- MODE 2: MULTI-STEP USER LOOP (BATCHED & OPTIMIZED) ---
     if (modeArg === "user-activity") {
       const provider = providers.globalChain;
       const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, provider);
-      const results = [];
       
       if (txType === "Deposit") {
         const count = await contract.getUserDepositCount(userAddress);
         const totalItems = Number(count);
         const fetchCount = Math.min(totalItems, limit);
 
+        // 1. Build an array of indices to fetch
+        const indices = [];
         for (let i = totalItems - 1; i >= totalItems - fetchCount; i--) {
-          const item = await contract.getDepositUser(userAddress, i);
-          results.push({ index: i, item: item.toString() });
+          indices.push(i);
         }
+
+        // 2. Map indices to immediate RPC promise calls
+        const promises = indices.map(i => contract.getDepositUser(userAddress, i));
+        
+        // 3. Resolve everything concurrently
+        const batchResults = await Promise.all(promises);
+
+        // 4. Construct response payload
+        const results = indices.map((idx, arrayPos) => ({
+          index: idx,
+          item: batchResults[arrayPos].toString()
+        }));
+
+        return { status: "Success", data: results };
+
       } else {
+        // Mirror the exact same parallel fix for the Withdrawal track
         const count = await contract.getUserTermCount(userAddress);
         const totalItems = Number(count);
         const fetchCount = Math.min(totalItems, limit);
 
+        const indices = [];
         for (let i = totalItems - 1; i >= totalItems - fetchCount; i--) {
-          const item = await contract.getWithdrawalUser(userAddress, i);
-          results.push({ index: i, item: item.toString() });
+          indices.push(i);
         }
+
+        const promises = indices.map(i => contract.getWithdrawalUser(userAddress, i));
+        const batchResults = await Promise.all(promises);
+
+        const results = indices.map((idx, arrayPos) => ({
+          index: idx,
+          item: batchResults[arrayPos].toString()
+        }));
+
+        return { status: "Success", data: results };
       }
-      return { status: "Success", data: results };
     }
 
     if (modeArg === "verify-erc20-receipt") {
@@ -1233,6 +1252,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
         ok: true,
         senderAddress: matchedTransfer.from,
         amount: formattedAmount,
+        rawAmount: matchedTransfer.rawValue.toString(),
         tokenSymbol: tokenSymbol,
         tokenAddress: matchedTransfer.tokenAddress
       };
@@ -1277,7 +1297,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       }
 
       console.log(`Executing contract state modification using signer: ${signer.address}`);
-      const writeableContract = new ethers.Contract(deployments.GlobalSheild, CONTRACT_ABI, signer);
+      const writeableContract = new ethers.Contract(deployments.GlobalShield, CONTRACT_ABI, signer);
 
       // 2. Parse and normalize parameters to fit your flat function arguments
       const buyerAddress = buyerWalletAddress;
@@ -1450,17 +1470,16 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
     if (action === "GET_HISTORY") {
       const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, providers.globalChain);
       const cloneAddresses = await registryContract.getSwapsForUser(userAddress);
-      const historyRecords = [];
 
-      for (let i = 0; i < cloneAddresses.length; i++) {
-        const swapAddr = cloneAddresses[i];
-        const structDetails = await registryContract.swapRegistry(swapAddr);
-        
-        // Inspect individual lifecycle flags inside the unique instance clone
+      // 1. Fire off the registry details requests in parallel
+      const registryPromises = cloneAddresses.map(swapAddr => 
+        registryContract.swapRegistry(swapAddr)
+      );
+      const allStructDetails = await Promise.all(registryPromises);
+
+      // 2. Fire off the clone instance specific details in parallel
+      const instancePromises = cloneAddresses.map(async (swapAddr) => {
         const instanceContract = new ethers.Contract(swapAddr, CLONE_INSTANCE_ABI, providers.globalChain);
-        let partyAClosed = false;
-        let partyBClosed = false;
-
         try {
           const [pA_Done, pB_Done, pA_Dep, pB_Dep] = await Promise.all([
             instanceContract.payoutACompleted(),
@@ -1468,17 +1487,25 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
             instanceContract.partyADeposited(),
             instanceContract.partyBDeposited()
           ]);
-          partyAClosed = pA_Done || pA_Dep;
-          partyBClosed = pB_Done || pB_Dep;
+          return {
+            partyAClosed: pA_Done || pA_Dep,
+            partyBClosed: pB_Done || pB_Dep
+          };
         } catch (err) {
-          // Fallback if the clone instance is uninitialized or empty
+          return { partyAClosed: false, partyBClosed: false };
         }
+      });
+      const allInstanceDetails = await Promise.all(instancePromises);
+
+      // 3. Assemble everything synchronously into your array
+      const historyRecords = cloneAddresses.map((swapAddr, i) => {
+        const structDetails = allStructDetails[i];
+        const instanceDetails = allInstanceDetails[i];
 
         const tokenAMatch = supportedTokens.find(t => t.address.toLowerCase() === structDetails.tokenA.toLowerCase());
         const tokenBMatch = supportedTokens.find(t => t.address.toLowerCase() === structDetails.tokenB.toLowerCase());
 
-        // Push the cleaned record directly to the frontend array
-        historyRecords.push({
+        return {
           id: `${swapAddr}-${i}`,
           cloneAddress: swapAddr,
           partyA: structDetails.partyA,
@@ -1489,14 +1516,13 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
           amountB: structDetails.amountB.toString(),
           status: Number(structDetails.status),
           statusLabel: REGISTRY_STATUS_LABELS[Number(structDetails.status)] || "Unknown",
-          partyAClosed,
-          partyBClosed,
-          
-          // If found in your array, use its true symbol. Otherwise, fall back gracefully.
+          partyAClosed: instanceDetails.partyAClosed,
+          partyBClosed: instanceDetails.partyBClosed,
           symbolA: tokenAMatch ? tokenAMatch.symbol : "UNKNOWN",
           symbolB: tokenBMatch ? tokenBMatch.symbol : "UNKNOWN"
-        });
-      }
+        };
+      });
+
       return { success: true, data: historyRecords };
     }
 
@@ -1507,7 +1533,7 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
     }
     const adminSigner = new ethers.Wallet(activeAdminSession.secret, providers.globalChain);
     const registryContract = new ethers.Contract(contractAddress, REGISTRY_ABI, adminSigner);
-    const shield = new ethers.Contract(deployments.GlobalSheild, REGISTRY_ABI, adminSigner);
+    const shield = new ethers.Contract(deployments.GlobalShield, REGISTRY_ABI, adminSigner);
     const ts = Math.floor(Date.now() / 1000);
 
     // --- SUB-ROUTINE 2: DEPLOY NEW ESCROW ---
@@ -1516,10 +1542,10 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
         partyA,
         partyB,
         tokenA,
-        amountA, 
+        BigInt(amountA || 0),
         partyADepositHash,
         tokenB,
-        amountB,
+        BigInt(amountB || 0),
         partyBDepositHash,
         ts,
         { gasLimit: 250_000 }

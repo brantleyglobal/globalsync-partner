@@ -26,8 +26,7 @@ export default function AdminDashboard() {
   // Section 1: Contract Queries
   // -----------------------------
 
-  // Add this state alongside your showAuthDrawer and isOpen states
-  const [portalView, setPortalView] = useState('hub'); // Defaulting to your current view
+  const [portalView, setPortalView] = useState('hub');
   const [loading, setLoading] = useState(false);
   const rpcUp = useRpcStatus();
   
@@ -87,7 +86,6 @@ export default function AdminDashboard() {
   const [shippingDays, setShippingDays] = useState(90);
   
   const [currentView, setCurrentView] = useState('hub');
-  // This forces React to look at the browser's storage on refresh before defaulting to null
   const [lastVisitedMatrix, setLastVisitedMatrix] = useState(() => {
     return localStorage.getItem('last_visited_matrix') || null;
   });
@@ -184,23 +182,6 @@ export default function AdminDashboard() {
     } else {
       setTimestampResults([{ error: "Failed to fetch data from backend" }]);
     }1
-  };
-
-  const handlePurchaseNative = async (amount, tokenSymbolOrAddress, rate) => {
-    try {
-      console.log(`Processing backend transaction for ${amount} ${tokenSymbolOrAddress} at rate ${rate}`);
-      
-      // 1. Call your web3 provider / electron IPC pipeline / smart contract here
-      // const tx = await myContract.buyGBDo(amount, ...);
-      // await tx.wait();
-
-      // 2. Return a safe success flag so the Sidebar knows it can clear inputs and close drawers
-      return { success: true };
-      
-    } catch (error) {
-      console.error("Parent transaction routing failure:", error);
-      return { success: false, message: error.message };
-    }
   };
 
   // -----------------------------
@@ -402,8 +383,9 @@ export default function AdminDashboard() {
       if (!purchaseTxHash) {
         throw new Error("Missing Transaction Hash! You must provide the user's transaction payment hash.");
       }
-      if (!purchaseTxHash.startsWith("0x") || purchaseTxHash.length < 66) {
-        throw new Error(`Invalid Hash Format! "${purchaseTxHash}" must be a 66-character hex string starting with 0x.`);
+
+      if (!ethers.isHexString(purchaseTxHash, 32)) {
+        throw new Error(`Invalid Hash Format! "${purchaseTxHash}" must be a valid 66-character hex string.`);
       }
 
       let verificationResponse = null;
@@ -427,7 +409,7 @@ export default function AdminDashboard() {
         throw new Error(verificationResponse?.reason || "Receipt was not found on the blockchain indexer.");
       }
 
-      const rawLoggedTokenAmount = BigInt(verificationResponse.amount);
+      const rawLoggedTokenAmount = BigInt(verificationResponse.rawAmount);
       const actualDecimalsOfPaymentToken = verificationResponse.decimals ?? targetDecimals ?? 18;
       const normalizedPaidAmountBase18 = BigInt(
         rescaleAmount(rawLoggedTokenAmount, actualDecimalsOfPaymentToken, targetDecimalsBase18)
@@ -463,7 +445,7 @@ export default function AdminDashboard() {
     let activeExchangeRateBigInt = ethers.parseUnits("1.0", 18);
     try {
       const selectedTokenSymbol = selectedStableTokenSymbol || "USDT"; 
-      const matchedToken = rate.rates.find(
+      const matchedToken = rates.rates.find(
         (r) => r.symbol.toUpperCase() === selectedTokenSymbol.toUpperCase()
       );
 
@@ -558,9 +540,9 @@ export default function AdminDashboard() {
       checkoutAsset: assetData.assetId,
       quantity,
       totalTokenAmount,
-      userAddress: buyerWalletAddresss,
-      tokenSymbol: selectedTokenSymbol,
-      configuration: configurationSummary,
+      userAddress: buyerWalletAddress,
+      tokenSymbol: selectedStableTokenSymbol,
+      configuration: payload.configurationSummary,
       address,
       phone,
       country: selectedCountryKey,
@@ -809,7 +791,6 @@ export default function AdminDashboard() {
       setExchangeRate={setExchangeRate}
       convertedAmount={convertedAmount}
       setConvertedAmount={setConvertedAmount}
-      purchaseNative={handlePurchaseNative}
       isConnected={isConnected}
       onConnectWallet={handleSecureConnect}
       onDisconnectWallet={handleSecureDisconnect}

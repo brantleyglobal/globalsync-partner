@@ -162,7 +162,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
       }
 
       // Verify ownership and balance thresholds against checked chain receipt data
-      const rawLoggedTokenAmount = BigInt(verificationResponse.amount);
+      const rawLoggedTokenAmount = BigInt(verificationResponse.rawAmount);
       const actualDecimalsOfPaymentToken = verificationResponse.decimals ?? 18;
       const normalizedPaidAmountBase18 = BigInt(
         rescaleAmount(rawLoggedTokenAmount, actualDecimalsOfPaymentToken, targetDecimalsBase18)

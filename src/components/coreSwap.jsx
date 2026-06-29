@@ -129,7 +129,6 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
       let pendingEscrows = 0;
       const processedRecords = records.map((rec, index) => {
         const isPending = rec.status === 0;
-        if (isPending) pendingEscrows++;
 
         return {
           index: index,
@@ -140,11 +139,14 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
           shortAddress: rec.cloneAddress 
             ? `${rec.cloneAddress.slice(0, 6)}...${rec.cloneAddress.slice(-4)}`
             : "0xNone",
-          offered: `${formatAllocation(BigInt(rec.amountA || 0))} ${rec.symbolA || 'Tokens'}`,
+          offered: `${parseFloat(ethers.formatUnits(rec.amountA || 0, 18)).toLocaleString()} ${rec.symbolA}`,
           requested: `${formatAllocation(BigInt(rec.amountB || 0))} ${rec.symbolB || 'Tokens'}`,
-          statusLabel: rec.statusLabel.toUpperCase() 
+          statusLabel: rec.statusLabel.toUpperCase(),
+          isPending: isPending
         };
       });
+
+      const pendingEscrows = processedRecords.filter(rec => rec.isPending).length;
 
       setSwapRecords(processedRecords);
       setTotals({ totalSwaps: processedRecords.length, pendingCount: pendingEscrows });
@@ -167,12 +169,10 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
     // INLINE HELPER: Strips formatting and scales to an 18-decimal integer string
     const toOnChainWeiString = (displayValue) => {
       if (!displayValue) return "0";
-      // Strip out commas or spaces introduced by the masking formatter
       const sanitized = displayValue.replace(/,/g, '').trim();
       if (isNaN(sanitized) || sanitized === "") return "0";
       
-      // Forces precision math to evaluate cleanly as a flat integer string
-      return (parseFloat(sanitized) * 1e18).toFixed(0).toString();
+      return ethers.parseEther(sanitized).toString();
     };
 
     try {
@@ -231,7 +231,10 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
       if (response.success) {
         setActionFeedback({ success: true, message: `Operation completed. Tx: ${response.txHash || '0xOK'}` });
         setDepositTxHash(''); 
-        await fetchSwapLogs();
+        
+        setTimeout(async () => {
+          await fetchSwapLogs();
+        }, 1500);
       } else {
         throw new Error(response.error || "Execution reverted.");
       }
