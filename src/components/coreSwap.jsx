@@ -125,8 +125,7 @@ export default function GlobalSwapPortal({ userAddress, isConnected }) {
         setTotals({ totalSwaps: 0, pendingCount: 0 });
         return;
       }
-
-      let pendingEscrows = 0;
+      
       const processedRecords = records.map((rec, index) => {
         const isPending = rec.status === 0;
 
