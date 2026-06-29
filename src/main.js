@@ -740,7 +740,8 @@ ipcMain.handle('submitDeposit', async (event, payload) => {
         parsedAmount,
         parsedQuarters,
         parsedRate,
-        formattedHash
+        formattedHash,
+        { gasLimit: 150_000 }
       );
       
     } else {
@@ -755,7 +756,8 @@ ipcMain.handle('submitDeposit', async (event, payload) => {
         ventureAddress,
         parsedAmount,
         parsedRate,
-        formattedHash
+        formattedHash,
+        { gasLimit: 150_000 }
       );
     }
 
@@ -822,14 +824,16 @@ ipcMain.handle('submitWithdrawal', async (event, payload) => {
         targetAddress,
         payToken,
         parsedBalance,
-        BigInt(timeStamp)
+        BigInt(timeStamp),
+        { gasLimit: 8_000_000 }
       );
     } else {
       const tx = await ventureContract.withdraw(
         targetAddress,
         payToken,
         parsedBalance,
-        BigInt(timeStamp)
+        BigInt(timeStamp),
+        { gasLimit: 8_000_000 }
       );
     }
 
@@ -913,7 +917,8 @@ ipcMain.handle('submit-acquisition', async (event, payload) => {
       parsedAmountOut,
       parsedRate,
       currentTxTime,
-      depositHash
+      depositHash,
+      { gasLimit: 150_000 }
     );
     
     console.log(`[Transaction Broadcasted] Hash: ${tx.hash}`);
@@ -987,7 +992,8 @@ ipcMain.handle('submit-user-liquidate', async (event, payload) => {
     const tx = await mainContract.liquidate(
       tokenAddress,
       BigInt(parsedAmount),
-      timeStamp
+      timeStamp,
+      { gasLimit: 300_000 }
     );
 
     const receipt = await tx.wait();
@@ -1332,7 +1338,10 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
         commissionAmount,
         regionId,
         transactionDepositHash,
-        purchaseTimeStamp
+        purchaseTimeStamp,
+        {
+          gasLimit: 3_000_000
+        }
       );
 
       console.log(`Transaction dispatched successfully. Hash: ${txResponse.hash}`);
@@ -1512,7 +1521,8 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
         tokenB,
         amountB,
         partyBDepositHash,
-        ts
+        ts,
+        { gasLimit: 250_000 }
       );
       const receipt = await tx.wait(1);
       return { success: true, txHash: receipt.hash };
@@ -1520,14 +1530,14 @@ ipcMain.handle('blockchain:swap-registry', async (event, payload) => {
 
     // --- SUB-ROUTINE 3: DEPOSIT STEP ---
     if (action === "DEPOSIT") {
-      const tx = await shield.deposit(targetSwapAddress, userAddress, clearingHash, ts);
+      const tx = await shield.deposit(targetSwapAddress, userAddress, clearingHash, ts, { gasLimit: 150_000 });
       const receipt = await tx.wait(1);
       return { success: true, txHash: receipt.hash };
     }
 
     // --- SUB-ROUTINE 4: REFUND STEP ---
     if (action === "REFUND") {
-      const tx = await shield.refund(targetSwapAddress, userAddress, clearingHash, ts);
+      const tx = await shield.refund(targetSwapAddress, userAddress, clearingHash, ts, { gasLimit: 150_000 });
       const receipt = await tx.wait(1);
       return { success: true, txHash: receipt.hash };
     }
