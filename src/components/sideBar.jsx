@@ -353,6 +353,7 @@ export default function Sidebar({
   
           // Compute token → GBDo
           const exchangeRateFloat = tokenRate / gbdo;
+          console.log(exchangeRateFloat);
   
           // Extra validation
           if (!isFinite(exchangeRateFloat)) {
@@ -502,7 +503,16 @@ export default function Sidebar({
           </div>
 
           {showAuthDrawer && (
-              <div style={{ ...styles.configSection, marginTop: "12px", borderTop: "1px dashed #222", paddingTop: "12px" }}>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault(); // Prevents page reload
+                if (!isConnected) {
+                  handleSaveCredentials();
+                }
+              }}
+              style={{ ...styles.configSection, marginTop: "12px", borderTop: "1px dashed #222", paddingTop: "12px", display: "flex", flexDirection: "column" }}
+            >
+              {/*<div style={{ ...styles.configSection, marginTop: "12px", borderTop: "1px dashed #222", paddingTop: "12px" }}>*/}
               <p style={styles.microText}>Required for executing transactions.</p>
               
               <label style={styles.label}>ADMIN WALLET ADDRESS</label>
@@ -760,15 +770,17 @@ export default function Sidebar({
 
               {!isConnected &&  ( 
 
-              <button style={{
-                ...styles.btnForestGreen,
-                background: "#0a0a0a96",
-                border: "1px solid rgba(0, 0, 0, 0.76)",
-                fontWeight: "lighter",
-                fontSize: "11px",
-                marginBottom: "8px"
-                }} onClick={handleSaveCredentials}>
-                  CONNECT WALLET
+              <button 
+                type="submit"
+                style={{
+                  ...styles.btnForestGreen,
+                  background: "#0a0a0a96",
+                  border: "1px solid rgba(0, 0, 0, 0.76)",
+                  fontWeight: "lighter",
+                  fontSize: "11px",
+                  marginBottom: "8px"
+                  }} onClick={handleSaveCredentials}>
+                    CONNECT WALLET
               </button>
               )}
 
@@ -801,7 +813,7 @@ export default function Sidebar({
                   DISCONNECT WALLET
                   </button>
               )}
-              </div>
+              </form>
           )}
         </div>
 
@@ -837,7 +849,16 @@ export default function Sidebar({
           </div>
 
           {showPurchaseDrawer && (
-              <div style={{ ...styles.configSection, marginTop: "12px", borderTop: "1px dashed #222", paddingTop: "12px" }}>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault(); // Prevents page reload
+                if (!isConnected) {
+                  handleSaveCredentials();
+                }
+              }}
+              style={{ ...styles.configSection, marginTop: "12px", borderTop: "1px dashed #222", paddingTop: "12px", display: "flex", flexDirection: "column" }}
+            >
+              {/*<div style={{ ...styles.configSection, marginTop: "12px", borderTop: "1px dashed #222", paddingTop: "12px" }}>*/}
               {!isConnected && (
                 <p style={styles.microText}>Wallet connection required to proceed.</p>
               )}
@@ -1003,7 +1024,7 @@ export default function Sidebar({
 
               {isConnected && (
                   <button 
-                  type="button"
+                  type="submit"
                   onClick={handleNativePurchase}
                   style={{
                       width: "100%",
@@ -1030,7 +1051,7 @@ export default function Sidebar({
                   SUBMIT PURCHASE
                   </button>
               )}
-              </div>
+              </form>
           )}
         </div>
 

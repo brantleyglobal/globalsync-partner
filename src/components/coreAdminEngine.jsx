@@ -8,8 +8,12 @@ export default function CoreAdminEngine({
   authMethod,
   selectedType,
   setSelectedType,
+  selectedLType,
+  setSelectedLType,
   selectedContract,
   setSelectedContract,
+  selectedLContract,
+  setSelectedLContract,
   contracts,
   startDate,
   setStartDate,
@@ -141,13 +145,13 @@ export default function CoreAdminEngine({
                   </select>
                 </div>
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>TARGET INTERFACE</label>
+                  <label style={styles.label}>TARGET CONTRACT</label>
                   <select
                     style={styles.inputElement}
                     value={selectedContract}
                     onChange={(e) => setSelectedContract(e.target.value)}
                   >
-                    <option value="" disabled style={{ background: "#121212" }}>Smart Contract</option>
+                    <option value="" disabled style={{ background: "#121212" }}>Contract</option>
                     {contracts.map((c) => (
                       <option key={c.address} value={c.address} style={{ background: "#121212" }}>
                         {c.name} ({c.address ? `${c.address.slice(0,6)}...` : 'No Hex'})
@@ -212,14 +216,14 @@ export default function CoreAdminEngine({
           {/* SECTION 3 — USER ACCOUNT MATRIX AUDITOR */}
           <div style={{ ...styles.sectionCard, height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
             <div>
-              <h2 style={styles.sectionTitle}>USER TRANSACTION MONITOR</h2>
+              <h2 style={styles.sectionTitle}>USER TRANSACTIONS</h2>
               <div style={styles.formRow}>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>HISTORY TYPE</label>
                   <select
                     style={styles.inputElement}
-                    value={selectedType}
-                    onChange={(e) => setSelectedType(e.target.value)}
+                    value={selectedLType}
+                    onChange={(e) => setSelectedLType(e.target.value)}
                   >
                     <option value="" disabled style={{ background: "#121212" }}>Transaction Type</option>
                     <option value="DEPOSIT" style={{ background: "#121212" }}>Deposits</option>
@@ -236,17 +240,34 @@ export default function CoreAdminEngine({
                   />
                 </div>
               </div>
-
-              <label style={styles.label}>TARGET WALLET ADDRESS</label>
-              <input
-                type="text"
-                placeholder="0x..."
-                style={styles.inputElement}
-                value={walletAddress}
-                onChange={(e) => setWalletAddress(e.target.value)}
-              />
+              <div style={styles.formRow}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>TARGET WALLET ADDRESS</label>
+                  <input
+                    type="text"
+                    placeholder="0x..."
+                    style={styles.inputElement}
+                    value={walletAddress}
+                    onChange={(e) => setWalletAddress(e.target.value)}
+                  />
+                </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>TARGET CONTRACT</label>
+                  <select
+                    style={styles.inputElement}
+                    value={selectedLContract}
+                    onChange={(e) => setSelectedLContract(e.target.value)}
+                  >
+                    <option value="" disabled style={{ background: "#121212" }}>Contract</option>
+                    {contracts.map((c) => (
+                      <option key={c.address} value={c.address} style={{ background: "#121212" }}>
+                        {c.name} ({c.address ? `${c.address.slice(0,6)}...` : 'No Hex'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
-
             <button style={{ ...styles.btnForestGreen, marginTop: "16px" }} onClick={handleUserQuery}>
               PULL LEDGER HISTORY
             </button>

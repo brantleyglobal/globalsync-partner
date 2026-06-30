@@ -35,7 +35,9 @@ export default function AdminDashboard() {
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState("");
+  const [selectedLContract, setSelectedLContract] = useState("");
   const [selectedType, setSelectedType] = useState("");
+  const [selectedLType, setSelectedLType] = useState("");
   const [selectedTermNumber, setSelectedTermNumber] = useState(Number);
   const [payoutType, setPayoutType] = useState("");
   const [timestampResults, setTimestampResults] = useState([]);
@@ -213,11 +215,11 @@ export default function AdminDashboard() {
   const [userQueryResults, setUserQueryResults] = useState([]);
 
   const handleUserQuery = async () => {
-    if (!selectedContract) {
+    if (!selectedLContract) {
       alert("Please select a contract!");
       return;
     }
-    if (!selectedType) {
+    if (!selectedLType) {
       alert("Please select a transaction type!");
       return;
     }
@@ -226,14 +228,14 @@ export default function AdminDashboard() {
     
     const payload = {
       modeArg: "user-activity",
-      contractAddress: selectedContract, // Named cleanly for backend
-      txType: selectedType,
+      contractAddress: selectedLContract, // Named cleanly for backend
+      txType: selectedLType,
       userAddress: walletAddress,
       limit: limit
     };
 
     console.log("Querying User Activity...", payload);
-    const response = await window.api.triggerVault(payload);
+    const response = await window.electronAPI.triggerVault(payload);
     setUserQueryResults(response?.status === "Success" ? response.data : []);
   };
 
@@ -278,7 +280,7 @@ export default function AdminDashboard() {
 
       // --- THE SHIELD LAYER ---
       try {
-        response = await window.api.triggerVault(payload);
+        response = await window.electronAPI.triggerVault(payload);
       } catch (ipcError) {
         // Quietly log the raw code/network exception to the developer tools console
         console.error("IPC verification pipeline background crash:", ipcError);
@@ -409,7 +411,7 @@ export default function AdminDashboard() {
 
       // --- THE SHIELD LAYER ---
       try {
-        verificationResponse = await window.api.triggerVault({
+        verificationResponse = await window.electronAPI.triggerVault({
           modeArg: "verify-erc20-receipt",
           transactionHash: purchaseTxHash,
           custodialWallet: targetTreasuryVault 
@@ -529,7 +531,7 @@ export default function AdminDashboard() {
     try {
       console.log("Broadcasting multi-step coordinated execution payload to Electron backend...", payload);
       
-      const response = await window.api.triggerVault(payload);
+      const response = await window.electronAPI.triggerVault(payload);
       setUserQueryResults(Array.isArray(response) ? response : [response]);
       
       // Extract the live hash out of the success payload object
@@ -1137,8 +1139,12 @@ export default function AdminDashboard() {
           authMethod={authMethod}
           selectedType={selectedType}
           setSelectedType={setSelectedType}
+          selectedLType={selectedLType}
+          setSelectedLType={setSelectedLType}
           selectedContract={selectedContract}
           setSelectedContract={setSelectedContract}
+          selectedLContract={selectedLContract}
+          setSelectedLContract={setSelectedLContract}
           contracts={contracts}
           startDate={startDate}
           setStartDate={setStartDate}

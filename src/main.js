@@ -1111,7 +1111,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       
       if (txType.toUpperCase() === "DEPOSIT") {
         const count = await contract.getUserDepositCount(userAddress);
-        const totalItems = Number(count);
+        const totalItems = Number(1n);
         const fetchCount = Math.min(totalItems, limit);
 
         // 1. Build an array of indices to fetch
