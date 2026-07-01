@@ -933,8 +933,28 @@ export default function Sidebar({
                           Select {transactionType === "deposit" ? "Deposit" : "Withdrawal"} Asset
                         </option>
                         {Array.isArray(supportedTokens) && supportedTokens
-                          .filter((token) => !["BTC", "LINK", "ETH", "UNI", "MATIC", "COPx", "GBDo"].includes(token.symbol))
-                          .map((token) => (
+                        .filter((token) => {
+                          // 1. Define tokens that always have liquidity issues or are test vectors (Never show anywhere)
+                          const systemExclusions = [
+                            "BRZ", "MMXN", "AUDD", "AUDT", "NGNT", 
+                            "COPx", "GLB", "TGUSA", "TGMX", "CREs", "CREh", "CGRi"
+                          ];
+
+                          // 2. Define highly volatile assets that are perfectly safe for cashout but dangerous for buyin
+                          const volatileCrypto = ["WBTC", "cbBTC", "ETH", "LINK", "UNI", "MATIC"];
+
+                          // 3. Apply the conditional logic
+                          if (systemExclusions.includes(token.symbol)) {
+                            return false; // Always hidden
+                          }
+
+                          if (transactionType === "deposit" && volatileCrypto.includes(token.symbol)) {
+                            return false; // Hide volatile assets during buy-in/deposits
+                          }
+
+                          return true; // Show everything else
+                        })
+                        .map((token) => (
                           <option key={`tokenB-${token.address}`} value={token.symbol} style={{ background: "#121212" }}>
                             {token.symbol} ({token.name || token.chain})
                           </option>

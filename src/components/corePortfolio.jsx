@@ -39,7 +39,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
   const [depositHash, setDepositHash] = useState("");
   const [depositLoading, setDepositLoading] = useState(false);
 
-  const [depositor, setDepositor] = useState(false);
+  const [depositor, setDepositor] = useState("");
 
   // Withdrawal Parameters State
   const [withdrawType, setWithdrawType] = useState("SMART_VAULT"); 
@@ -930,7 +930,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
                         Select {depositType === "deposit" ? "Deposit" : "Withdrawal"} Asset
                       </option>
                       {Array.isArray(supportedTokens) && supportedTokens
-                        .filter((token) => !["BTC", "LINK", "ETH", "UNI", "MATIC", "COPx", "CGRi", "TGUSA", "TGMX"].includes(token.symbol))
+                        .filter((token) => !["WBTC", "cbBTC", "ETH", "LINK", "UNI", "MATIC", "BRZ", "MMXN", "AUDD", "AUDT", "NGNT", "COPx", "GLB", "TGUSA", "TGMX", "CREs", "CREh", "CGRi"].includes(token.symbol))
                         .map((token) => (
                         <option key={`tokenB-${token.address}`} value={token.symbol} style={{ background: "#121212" }}>
                           {token.symbol} ({token.name || token.chain})
@@ -1057,7 +1057,7 @@ export default function CorePortfolioMatrix({ userAddress, activeContract, onTot
                         Select {withdrawType === "deposit" ? "Deposit" : "Withdrawal"} Asset
                       </option>
                       {Array.isArray(supportedTokens) && supportedTokens
-                        .filter((token) => !["BTC", "COPx"].includes(token.symbol))
+                        .filter((token) => !["GBDx", "COPx", "GLB", "TGUSA", "TGMX", "CREs", "CREh", "AUDD", "AUDT", "BRZ", "MMXN", "NGNT", "INRX", "TRYX", "ZARP"].includes(token.symbol))
                         .map((token) => (
                         <option key={`tokenB-${token.address}`} value={token.symbol} style={{ background: "#121212" }}>
                           {token.symbol} ({token.name || token.chain})

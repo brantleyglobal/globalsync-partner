@@ -477,7 +477,7 @@ export default function PartnerPortal({
                 >
                   <option value="" disabled style={{ background: "#121212" }}>Payment Token</option>
                   {supportedTokens
-                    .filter((token) => !["BTC", "LINK", "ETH", "UNI", "MATIC", "COPx"].includes(token.symbol))
+                    .filter((token) => !["WBTC", "cbBTC", "ETH", "LINK", "UNI", "MATIC", "BRZ", "MMXN", "AUDD", "AUDT", "NGNT", "COPx", "GLB", "TGUSA", "TGMX", "CREs", "CREh", "CGRi"].includes(token.symbol))
                     .map((token) => (
                       <option key={token.symbol} value={token.symbol} style={{ background: "#121212" }}>
                         {token.symbol} ({token.name || token.chain})
