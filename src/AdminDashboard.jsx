@@ -65,6 +65,8 @@ export default function AdminDashboard() {
   const [phone, setPhone] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
 
   const [selectedStableTokenSymbol, setSelectedStableTokenSymbol] = useState(""); // e.g., "LGE20KVA"
   const [selectedAssetKey, setSelectedAssetKey] = useState(""); // e.g., "LGE20KVA"
@@ -523,7 +525,15 @@ export default function AdminDashboard() {
       custodialDepositHash: trackedDepositHash,
       configurationSummary: `${chosenPanel.label || ""} / ${chosenGridTie.label || ""} / ${chosenMonitoring.label || ""}`,
       destinationCountry: selectedCountryKey,
-      cryptoAuth: credentialsPayload 
+      cryptoAuth: credentialsPayload,
+      // --- THE UNIFIED MEMORY STRUCT COMPLIANT PAYLOAD ---
+      shippingInfo: {
+        street: address,          // Binds directly to your street input hook
+        city: city,              // Captured via the new city input hook
+        state: state,            // Captured via the new state input hook
+        zip: postalCode,         // Maps to your zip string state hook
+        country: selectedCountryKey // Matches the exact country selection key name
+      }
     };
 
     let liveTransactionHash = "";
@@ -856,7 +866,7 @@ export default function AdminDashboard() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px", background: "#111", border: "1px solid #83828217", borderRadius: "4px", overflow: "hidden" }}>
             
             {/* TOP UTILITY 1: RESUME */}
-            <div style={{ background: "#090909", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "120px" }}>
+            <div style={{ background: "#090909", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "130px" }}>
               <div>
                 <span style={{ color: "#8d8d8d", fontSize: "10px", letterSpacing: "1px" }}>RESUME SESSION</span>
                 <p style={{ ...styles.label, color: lastVisitedMatrix ? "#fff" : "#444", fontSize: "13px", margin: "8px 0 0 0" }}>

@@ -232,10 +232,6 @@ autoUpdater.on('error', (err) => {
   console.error('Updater error:', err);
 });
 
-// ========================================================
-// EMAIL HANDLER
-// ========================================================
-
 function sanitizeBigInts(obj) {
   if (typeof obj === "bigint") return obj.toString();
   if (Array.isArray(obj)) return obj.map(sanitizeBigInts);
@@ -275,28 +271,45 @@ const ERC20_MINIMAL_ABI = [
   "event Transfer(address indexed from, address indexed to, uint256 value)"
 ];
 
+// ========================================================
+// EMAIL HANDLER
+// ========================================================
+
 ipcMain.handle('send-smtp-email', async (event, emailPayload) => {
+  // Destructure for readability and fallback defaults
+  const {
+    firstname = "",
+    lastname = "",
+    email = "",
+    tx = "",
+    receipt = "",
+    actionType = "return", // Useful to distinguish between refund / repair contexts
+    userAddress = ""
+  } = emailPayload || {};
+
   const payload = {
     jsonrpc: "2.0",
     method: "sendEmail",
     params: {
-      firstname: params.firstname,
-      lastname: params.lastname,
-      email: params.email,
-      tx: params.tx,
-      checkoutAsset: params.checkoutAsset,
-      quantity: params.quantity,
-      totalTokenAmount: params.totalTokenAmount,
-      userAddress: params.userAddress,
-      tokenSymbol: params.tokenSymbol,
-      configuration: params.configuration,
-      address: params.address,
-      phone: params.phone,
-      country: params.country,
-      promo: params.promo,
-      postalCode: params.postalCode,
-      receipt: params.receipt,
-      purchaseMadeEvents: params.purchaseMadeEvents,
+      firstname,
+      lastname,
+      email,
+      tx,
+      receipt,
+      actionType,
+      userAddress,
+      // Pass empty placeholders or extend if your gateway requires optional configurations
+      checkoutAsset: emailPayload.checkoutAsset || "",
+      quantity: emailPayload.quantity || 1,
+      totalTokenAmount: emailPayload.totalTokenAmount || "0",
+      tokenSymbol: emailPayload.tokenSymbol || "",
+      configuration: emailPayload.configuration || "",
+      address: emailPayload.address || "",
+      phone: emailPayload.phone || "",
+      country: emailPayload.country || "",
+      promo: emailPayload.promo || "",
+      postalCode: emailPayload.postalCode || "",
+      purchaseMadeEvents: emailPayload.purchaseMadeEvents || []
     },
     id: Date.now(),
   };
@@ -306,17 +319,18 @@ ipcMain.handle('send-smtp-email', async (event, emailPayload) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.API_SECRET, // Secured inside GitHub Actions/Environment
+        "x-api-key": process.env.API_SECRET,
       },
       body: JSON.stringify(sanitizeBigInts(payload)),
     });
 
     if (!res.ok) {
-      return { success: false, error: "Email sending failed" };
+      return { success: false, error: `Email gateway returned bad status code: ${res.status}` };
     }
     
     return { success: true };
   } catch (emailError) {
+    console.error("Desktop SMTP relay failure:", emailError);
     return { success: false, error: emailError.message };
   }
 });
@@ -489,30 +503,31 @@ ipcMain.handle('blockchain:get-balances', async (event, userAddress) => {
 // Add this under your existing handlers in main.js
 // Inside your main Electron process file where context bridges are set up
 ipcMain.handle('blockchain:get-partner-ledger', async (event, { userAddress, contractAddress, chainKey }) => {
-  if (!userAddress || !contractAddress) return [[], []];
+  if (!userAddress || !contractAddress) return [[], [], []];
 
   try {
     const partnerAbi = [
-      "function getUserPurchasesWithCredits(address user) view returns (tuple(uint256 id, uint256 amount, uint256 quantity, uint256 timestamp)[] terms, uint256[] credits)"
+      "function getUserPurchasesWithCredits(address user) view returns (tuple(address user, address token, address purchaseSetter, address refundSetter, uint256 region, uint256 purchaseIndex, uint256 quantity, uint256 id, uint256 timestamp, uint256 amount, uint256 shipping, uint256 customizations, uint256 rate, bool refund, bytes32 purchaseTxHash, bytes32 refundHash, bytes32 configs)[] terms, uint256[] credits, bytes32[] trackingNumbers)"
     ];
     
-    // Assumes providers.globalChain is instantiated inside your secure Node scope
     const contract = new ethers.Contract(contractAddress, partnerAbi, providers.globalChain);
-
-    const [terms, credits] = await contract.getUserPurchasesWithCredits(userAddress);
+    const [terms, credits, trackingNumbers] = await contract.getUserPurchasesWithCredits(userAddress);
     
-    // Format big variables safely to strings before shipping across the process channel
-    const serializedTerms = (terms || []).map(tx => ({
+    const serializedTerms = (terms || []).map((tx, idx) => ({
       id: tx.id.toString(),
       amount: tx.amount.toString(),
       quantity: tx.quantity.toString(),
-      timestamp: tx.timestamp.toString()
+      timestamp: tx.timestamp.toString(),
+      purchaseTxHash: tx.purchaseTxHash, // Retain raw transaction string pointer
+      // Decode the bytes32 tracking hex directly back to its readable carrier string string representation
+      trackingNumber: trackingNumbers && trackingNumbers[idx] && trackingNumbers[idx] !== ethers.ZeroHash
+        ? ethers.decodeBytes32String(trackingNumbers[idx])
+        : "Pending Assignment"
     }));
 
     const serializedCredits = (credits || []).map(c => c.toString());
 
     return [serializedTerms, serializedCredits];
-
   } catch (error) {
     console.error("Backend partner ledger sync failure:", error);
     throw error;
@@ -1088,7 +1103,8 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
       custodialDepositHash,
       configurationSummary,
       destinationCountry,
-      cryptoAuth
+      cryptoAuth,
+      shippingInfo,
     } = payload;
     
     // --- MODE 1: TIMESTAMP QUERY ---
@@ -1343,6 +1359,14 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
 
       console.log (customizationCost);
 
+      const normalizedShippingInfo = {
+        street: shippingInfo?.street || "",
+        city: shippingInfo?.city || "",
+        state: shippingInfo?.state || "",
+        zip: shippingInfo?.zip || "",
+        country: shippingInfo?.country || ""
+      };
+
       // 3. Dispatch live transaction execution matching signature exactly
       const txResponse = await writeableContract.purchase(
         buyerAddress,
@@ -1359,6 +1383,7 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
         regionId,
         transactionDepositHash,
         purchaseTimeStamp,
+        normalizedShippingInfo,
         {
           gasLimit: 3_000_000
         }
@@ -1375,6 +1400,67 @@ ipcMain.handle('trigger-vault', async (event, payload) => {
         data: receipt.hash, 
         summary: `Purchase successful! Config [${configurationSummary}] verified in block footprint.` 
       };
+    }
+
+    // --- MODE: REFUND & REPAIR RETURN HANDLER ---
+    if (modeArg === "process-return-action") {
+      const provider = providers.globalChain;
+
+      // 1. Enforce active admin desktop session security check
+      if (!activeAdminSession || !activeAdminSession.isConnected) {
+        return { status: "Error", error: "No active authorized profile loaded in desktop session memory." };
+      }
+
+      let signer;
+      try {
+        // 2. Hydrate signer using the desktop application's internal memory store
+        if (activeAdminSession.method === 'privateKey') {
+          signer = new ethers.Wallet(activeAdminSession.secret, provider);
+        } else if (activeAdminSession.method === 'mnemonic') {
+          signer = ethers.Wallet.fromPhrase(activeAdminSession.secret, provider);
+        } else if (activeAdminSession.method === 'keystore') {
+          signer = await ethers.Wallet.fromEncryptedJson(activeAdminSession.secret, activeAdminSession.password || "");
+          signer = signer.connect(provider);
+        } else {
+          return { status: "Error", error: "Unsupported structural signing key configuration." };
+        }
+      } catch (err) {
+        console.error("Failed to build signer from desktop workspace memory:", err);
+        return { status: "Error", error: `Signer hydration failed: ${err.message}` };
+      }
+
+      // 3. Instantiate the AssetPurchase contract instance with your secure background signer
+      const contractAddress = deployments.AssetPurchase; 
+      const writeableContract = new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
+
+      const targetReceiptHash = payload.receipt;
+      const isRepairFlag = payload.actionType === "repair";
+
+      console.log(`Executing return state modification [Action: ${payload.actionType}] via: ${signer.address}`);
+
+      try {
+        // 4. Dispatch the transaction directly to your network node
+        const txResponse = await writeableContract.processReturn(
+          targetReceiptHash,
+          isRepairFlag,
+          {
+            gasLimit: 150_000 // Safely handles storage mutation/reimbursement execution operations
+          }
+        );
+
+        console.log(`Transaction dispatched. Hash: ${txResponse.hash}`);
+        const receipt2 = await txResponse.wait();
+        console.log("Transaction successfully written to block storage:", receipt2.hash);
+
+        return { 
+          status: "Success", 
+          data: receipt2.hash 
+        };
+
+      } catch (contractErr) {
+        console.error("Contract runtime pipeline execution failed:", contractErr);
+        throw contractErr;
+      }
     }
 
     signer = null;

@@ -3,6 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { styles } from '../utils/styles.jsx';
 import { deployments, supportedTokens } from '../utils/tokensX.js';
 import { useRpcStatus } from "../utils/statusRpc";
+import SelectionStep from "./steps/selectionStep.jsx";
+import PurchaseStep from "./steps/purchaseStep.jsx";
+import RepairStep from "./steps/repairStep.jsx";
+import RefundStep from "./steps/refundStep.jsx";
 
 export default function PartnerPortal({
   userAddress,
@@ -48,6 +52,10 @@ export default function PartnerPortal({
   setPostalCode,
   address,
   setAddress,
+  city,
+  setCity,
+  state,
+  setState,
   handlePurchase,
   isConnected
 }) {
@@ -58,6 +66,8 @@ export default function PartnerPortal({
   const [error, setError] = useState(null);
 
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [portalStep, setPortalStep] = useState(1);
+  const [userAction, setUserAction] = useState(null);
   
   // High-level aggregate metrics for partner tracking
   const [metrics, setMetrics] = useState({
@@ -92,6 +102,64 @@ export default function PartnerPortal({
       setEmailError(""); // Optional: change to "Email is required" if it's mandatory
     } else if (!validateEmail(emailx)) {
       setEmailError("Please enter a valid email address");
+    }
+  };
+
+  // Inside your PartnerPortal component in corePartner.jsx
+
+  const [isActionProcessing, setIsActionProcessing] = useState(false);
+
+  const handleProcessReturn = async (actionType) => {
+    setIsActionProcessing(true);
+
+    if (!purchaseTxHash || !purchaseTxHash.startsWith("0x")) {
+      setIsActionProcessing(false);
+      alert("Invalid target transaction receipt hash.");
+      return;
+    }
+
+    try {
+      // 1. Dispatch the contract mutation directly via the exposed preload API
+      const response = await window.electronAPI.triggerVault({
+        modeArg: "process-return-action",
+        receipt: purchaseTxHash,
+        actionType: actionType
+      });
+
+      if (response.status !== "Success") {
+        setIsActionProcessing(false);
+        alert(`On-chain execution failed: ${response.error || "Unknown error"}`);
+        return;
+      }
+
+      const confirmedTxHash = response.data || purchaseTxHash;
+
+      // 2. Dispatch the automated SMTP email confirmation directly after
+      try {
+        await window.electronAPI.triggerVault({
+          modeArg: "send-smtp-email", // Or whatever key your preload maps to ipcMain 'send-smtp-email'
+          firstname,
+          lastname,
+          email,
+          userAddress,
+          receipt: purchaseTxHash,
+          tx: confirmedTxHash,
+          actionType: actionType
+        });
+      } catch (smtpErr) {
+        console.warn("Background notification email failed to dispatch:", smtpErr);
+      }
+
+      setIsActionProcessing(false);
+      
+      // Clean up modal state on success
+      setIsPurchaseModalOpen(false);
+      setPortalStep(1);
+
+    } catch (err) {
+      setIsActionProcessing(false);
+      console.error("IPC Communication Pipeline failure:", err);
+      alert(`Desktop channel failure: ${err.message}`);
     }
   };
 
@@ -141,7 +209,6 @@ export default function PartnerPortal({
           const rawCredit = serializedCredits && serializedCredits[index] ? BigInt(serializedCredits[index]) : 0n;
           const orderQuantity = parseInt(term.quantity, 10) || 0;
 
-          // Accumulate running numbers for aggregate cards
           cumulativeVolume += orderQuantity;
           cumulativeCost += rawAmount;
           cumulativeCredits += rawCredit;
@@ -155,7 +222,10 @@ export default function PartnerPortal({
             quantity: orderQuantity,
             cost: `${formatAllocation(rawAmount)} GBDo`,
             hasCredit: rawCredit > 0n,
-            manufacturerCredit: `${formatAllocation(rawCredit)} GBDo`
+            manufacturerCredit: `${formatAllocation(rawCredit)} GBDo`,
+            // Pass tracked elements down to layout arrays
+            trackingNumber: term.trackingNumber || "Pending Assignment",
+            txHash: term.purchaseTxHash
           };
         });
 
@@ -233,7 +303,7 @@ export default function PartnerPortal({
       <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
         {/* Trigger button mapped for the Asset Purchase structural form */}
         <button style={styles.btnForestGreen} onClick={() => setIsPurchaseModalOpen(true)}>
-          EXECUTE PURCHASE
+          PURCHASE HUB
         </button>
       </div>
 
@@ -266,6 +336,7 @@ export default function PartnerPortal({
             <tr style={{ borderBottom: "1px solid #161616", borderTop: "1px solid #161616" }}>
               <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px" }}>PURCHASE RECORD</th>
               <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px" }}>TIMESTAMP</th>
+              <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px" }}>CARRIER TRACKING</th>
               <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px", textAlign: "center" }}>QUANTITY</th>
               <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px", textAlign: "right" }}>SETTLEMENT COST</th>
               <th style={{ ...styles.label, padding: "12px 8px", color: "#666666", fontSize: "11px", textAlign: "right" }}>BUYER CREDIT</th>
@@ -274,7 +345,7 @@ export default function PartnerPortal({
           <tbody>
             {partnerOrders.length === 0 ? (
               <tr>
-                <td colSpan="5" style={{ ...styles.label, padding: "30px 8px", color: "#444444", textAlign: "center", fontStyle: "italic" }}>
+                <td colSpan="6" style={{ ...styles.label, padding: "30px 8px", color: "#444444", textAlign: "center", fontStyle: "italic" }}>
                   {loading ? "Decrypting partner allocation lines..." : "No operational activity recorded for the connected wallet."}
                 </td>
               </tr>
@@ -283,11 +354,16 @@ export default function PartnerPortal({
                 <tr key={`partner-order-${order.id}-${order.index}`} style={{ borderBottom: "1px solid #111111" }}>
                   <td style={{ ...styles.label, padding: "12px 8px", color: "#888888" }}>PT-TERM-{order.index.toString().padStart(3, '0')}</td>
                   <td style={{ ...styles.label, padding: "12px 8px", color: "#aaaaaa" }}>{order.date}</td>
+                  
+                  {/* NEW CARRIER TRACKING DATA CELL */}
+                  <td style={{ ...styles.label, padding: "12px 8px", color: order.trackingNumber === "Pending Assignment" ? "#555" : "#3b82f6", fontFamily: "monospace" }}>
+                    {order.trackingNumber}
+                  </td>
+
                   <td style={{ ...styles.label, padding: "12px 8px", textAlign: "center", color: "#bbb" }}>{order.quantity}</td>
                   <td style={{ ...styles.label, padding: "12px 8px", textAlign: "right", color: "#fff" }}>{order.cost}</td>
                   <td style={{ 
                     padding: "12px 8px", 
-                    
                     textAlign: "right", 
                     color: order.hasCredit ? "#1d5c34" : "#555555", 
                     fontWeight: order.hasCredit ? "600" : "normal" 
@@ -304,23 +380,12 @@ export default function PartnerPortal({
       {isPurchaseModalOpen && (
         <div 
           style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 }}
-          onClick={() => setIsPurchaseModalOpen(false)}
+          onClick={() => {
+            setIsPurchaseModalOpen(false);
+            setPortalStep(1); // Reset configuration paths gracefully
+          }}
         >
-          {/* Replace your old CSS Style Injection tag with this: */}
-          <style>{`
-            .custom-modal-scroll {
-              -ms-overflow-style: none;  /* IE and Edge */
-              scrollbar-width: none;     /* Firefox */
-            }
-            .custom-modal-scroll::-webkit-scrollbar {
-              display: none;             /* Chrome, Safari, and Opera */
-              width: 0 !important;
-              height: 0 !important;
-            }
-          `}</style>
-
           <div 
-            className="custom-modal-scroll"
             style={{ 
               ...styles.sectionCard, 
               width: "100%", 
@@ -328,431 +393,138 @@ export default function PartnerPortal({
               maxHeight: "calc(100vh - 40px)",
               overflowY: "auto", 
               position: "relative", 
-              padding: "20px",
+              padding: "24px",
               background: "#0d0d0d", 
-              border: "1px solid #1a1a1a", 
-              boxShadow: "0px 12px 40px rgba(0,0,0,0.7)" 
+              border: "1px solid #1a1a1a"
             }}
             onClick={(e) => e.stopPropagation()} 
           >
-            {/* CLOSE CONTROLLER ACTION */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px", paddingBottom: "8px" }}>
-              <h3 style={{ ...styles.sectionTitle, margin: 0, letterSpacing: "1px" }}>ASSET PURCHASE MANAGEMENT</h3>
-              <button 
-                onClick={() => setIsPurchaseModalOpen(false)}
-                style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "18px", fontWeight: "100", transition: "color 0.2s" }}
-                onMouseEnter={(e) => e.target.style.color = "#ef4444"}
-                onMouseLeave={(e) => e.target.style.color = "#666"}
-              >
-                ✕
-              </button>
-            </div>
-            {/* NEW ETCHED HORIZONTAL DIVIDER (Using your exact opacity weight) */}
-            <div style={{ display: "flex", alignItems: "center", width: "100%", paddingTop: "0px", margin: "0 0 40px 0" }}>
-              <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, rgba(255, 255, 255, 0.49) 0%, rgba(255,255,255,0.02) 80%, transparent 100%)" }} />
-            </div>
-
-            {/* ASSET CONFIGURATION LAYER */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <div>
-                <label style={styles.label}>SELECT MODEL (Required)</label>
-                <select 
-                  style={styles.inputElement} 
-                  value={selectedAssetKey} 
-                  onChange={(e) => {
-                    setSelectedAssetKey(e.target.value);
-                    setSelectedPanelKey("");
-                    setSelectedGridTieKey("");
-                    setSelectedMonitoringKey("");
-                    setSelectedCountryKey("");
-                  }}
-                >
-                  <option value="">Unit Model</option>
-                  {Object.keys(genData).map(key => (
-                    <option key={key} value={key}>{key} (ID: {genData[key].assetId})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={styles.label}>PANEL CONFIGURATION</label>
-                <select 
-                  style={styles.inputElement} 
-                  disabled={!selectedAssetKey}
-                  value={selectedPanelKey} 
-                  onChange={(e) => setSelectedPanelKey(e.target.value)}
-                >
-                  <option value="">Output Customization</option>
-                  {selectedAssetKey && Object.keys(genData[selectedAssetKey].panel).map(key => (
-                    <option key={key} value={key}>
-                      {genData[selectedAssetKey].panel[key].label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* DYNAMIC EXPANSION PANEL: HARDWARE CUSTOMIZATION */}
-            {selectedAssetKey && selectedPanelKey && genData[selectedAssetKey].panel[selectedPanelKey]?.label === "Customize" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px", padding: "12px", background: "#0a0a0a", borderRadius: "6px", border: "1px dashed #222" }}>
-                <div>
-                  <label style={styles.label}>VOLTAGE</label>
-                  <input type="number" style={styles.inputElement} value={selectedVoltage} onChange={(e) => setSelectedVoltage(e.target.value)} placeholder="240" />
-                </div>
-                <div>
-                  <label style={styles.label}>FREQUENCY</label>
-                  <select style={styles.inputElement} value={selectedFrequency} onChange={(e) => setSelectedFrequency(e.target.value)}>
-                    <option value="60Hz">60Hz</option>
-                    <option value="50Hz">50Hz</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={styles.label}>PHASE TYPE</label>
-                  <select style={styles.inputElement} value={selectedPhase} onChange={(e) => setSelectedPhase(e.target.value)}>
-                    <option value="Single-Phase">Single-Phase</option>
-                    <option value="Split-Phase">Split-Phase</option>
-                    <option value="3-Phase">3-Phase</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={styles.label}>LINE REACTOR</label>
-                  <select style={styles.inputElement} value={selectedReactor} onChange={(e) => setSelectedReactor(e.target.value)}>
-                    <option value="Default (None)">Default (None)</option>
-                    <option value="Line Reactor(s)">Line Reactor(s)</option>
-                  </select>
-                </div>
-              </div>
+            {/* Dynamic Action Multi-Step Router Matrix Layout */}
+            {portalStep === 1 && (
+              <SelectionStep 
+                userAction={userAction}
+                setUserAction={setUserAction}
+                onHelpToggle={() => console.log("Help context requested")}
+                onNext={() => {
+                  if (userAction === "purchase") setPortalStep(2);
+                  else if (userAction === "repair") setPortalStep(3); // Route to repair component
+                  else if (userAction === "refund") setPortalStep(4); // Route to refund component
+                }}
+              />
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "12px" }}>
-              <div>
-                <label style={styles.label}>GRID TIE INFRASTRUCTURE</label>
-                <select 
-                  style={styles.inputElement} 
-                  disabled={!selectedAssetKey}
-                  value={selectedGridTieKey} 
-                  onChange={(e) => setSelectedGridTieKey(e.target.value)}
-                >
-                  <option value="">Power Rating</option>
-                  {selectedAssetKey && Object.keys(genData[selectedAssetKey].gridTie).map(key => (
-                    <option key={key} value={key}>
-                      {genData[selectedAssetKey].gridTie[key].label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={styles.label}>INTEGRATED MONITORING</label>
-                <select 
-                  style={styles.inputElement} 
-                  disabled={!selectedAssetKey}
-                  value={selectedMonitoringKey} 
-                  onChange={(e) => setSelectedMonitoringKey(e.target.value)}
-                >
-                  <option value="">Remote Monitoring</option>
-                  {selectedAssetKey && Object.keys(genData[selectedAssetKey].monitoring).map(key => (
-                    <option key={key} value={key}>
-                      {genData[selectedAssetKey].monitoring[key].label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "12px" }}>
-              <div>
-                <label style={styles.label}>STABLECOIN SETTLEMENT (Required)</label>
-                <select 
-                  style={styles.inputElement} 
-                  value={selectedStableTokenSymbol} 
-                  onChange={(e) => {
-                    const symbol = e.target.value;
-                    setSelectedStableTokenSymbol(symbol);
-                    const tokenMeta = supportedTokens.find((t) => t.symbol === symbol);
-                    if (tokenMeta) {
-                      setSelectedTokenAddress(tokenMeta.address);
-                      setSelectedTokenDecimals(tokenMeta.decimals || 18);
-                      setSelectedTokenChain(tokenMeta.chain || "global");
-                    }
-                  }}
-                >
-                  <option value="" disabled style={{ background: "#121212" }}>Payment Token</option>
-                  {supportedTokens
-                    .filter((token) => !["WBTC", "cbBTC", "ETH", "LINK", "UNI", "MATIC", "BRZ", "MMXN", "AUDD", "AUDT", "NGNT", "COPx", "GLB", "TGUSA", "TGMX", "CREs", "CREh", "CGRi"].includes(token.symbol))
-                    .map((token) => (
-                      <option key={token.symbol} value={token.symbol} style={{ background: "#121212" }}>
-                        {token.symbol} ({token.name || token.chain})
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div>
-                <label style={styles.label}>SHIPPING FREIGHT REGION (Required)</label>
-                <select 
-                  style={styles.inputElement} 
-                  disabled={!selectedAssetKey}
-                  value={selectedCountryKey} 
-                  onChange={(e) => setSelectedCountryKey(e.target.value)}
-                >
-                  <option value="">Country/Region</option>
-                  {selectedAssetKey && Object.keys(genData[selectedAssetKey].countries).map(countryName => (
-                    <option key={countryName} value={countryName}>
-                      {countryName} (+{genData[selectedAssetKey].countries[countryName].toString()} days transit)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* LOGISTICS LAYER */}
-            <style>{`
-              .no-spinners-ever::-webkit-outer-spin-button,
-              .no-spinners-ever::-webkit-inner-spin-button {
-                -webkit-appearance: none !important;
-                margin: 0 !important;
-              }
-              .no-spinners-ever[type=number] {
-                -moz-appearance: textfield !important;
-              }
-            `}</style>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 3fr", gap: "16px", marginTop: "12px" }}>
-              <div>
-                {/* 1. Global Browser Override for Spinners */}
-                <style>{`
-                  /* Chrome, Safari, Edge, Opera */
-                  .clean-qty-input::-webkit-outer-spin-button,
-                  .clean-qty-input::-webkit-inner-spin-button {
-                    -webkit-appearance: none !important;
-                    margin: 0 !important;
-                  }
-                  /* Firefox */
-                  .clean-qty-input[type=number] {
-                    -moz-appearance: textfield !important;
-                  }
-                `}</style>
-
-                <label style={styles.label}>QUANTITY</label>
-                <div 
-                  style={{ 
-                    display: "flex", 
-                    alignItems: "center", 
-                    background: "#121212", 
-                    border: "1px solid #1a1a1a", 
-                    borderRadius: "4px", 
-                    height: "30px", 
-                    overflow: "hidden"
-                  }}
-                >
-                  {/* DECREMENT BUTTON */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      // 1. Grab the actual input box sitting right next to this button
-                      const input = e.currentTarget.parentNode.querySelector('.clean-qty-input');
-                      if (input) {
-                        const currentVal = parseInt(input.value, 10) || 1;
-                        const nextVal = Math.max(1, currentVal - 1);
-                        
-                        // 2. Explicitly change its value attribute
-                        input.value = nextVal;
-                        
-                        // 3. Fire a real native browser event so your parent onChange listener wakes up
-                        const event = new Event('input', { bubbles: true });
-                        input.dispatchEvent(event);
-                      }
-                    }}
-                    style={{ 
-                      background: "none", 
-                      border: "none", 
-                      color: "#666", 
-                      width: "30px", 
-                      height: "100%", 
-                      cursor: "pointer", 
-                      fontSize: "6px",
-                      fontWeight: "600",
-                      transition: "color 0.2s, background 0.2s",
-                      padding: 0,
-                      display: "flex",          
-                      alignItems: "center",      
-                      justifyContent: "center"   
-                    }}
-                    onMouseEnter={(e) => { e.target.style.color = "#ffffff"; e.target.style.background = "#141414"; }}
-                    onMouseLeave={(e) => { e.target.style.color = "#666"; e.target.style.background = "none"; }}
-                  >
-                    —
-                  </button>
-
-                  {/* THE NUMERIC INPUT BOX */}
-                  <input 
-                    type="number" 
-                    min="1"
-                    className="clean-qty-input" 
-                    style={{ 
-                      background: "none", 
-                      border: "none", 
-                      color: "#ffffff", 
-                      textAlign: "center", 
-                      width: "100%", 
-                      height: "100%",
-                      padding: 0,
-                      margin: 0,
-                      outline: "none"
-                    }} 
-                    // Safe fallback formatting to make sure it reads from the parent initially
-                    value={quantity === undefined || quantity === null || isNaN(parseInt(quantity, 10)) ? "1" : String(quantity)} 
-                    onChange={(e) => {
-                      if (typeof setSelectedQuantity === 'function') {
-                        setSelectedQuantity(e);
-                      }
-                    }}
-                  />
-
-                  {/* INCREMENT BUTTON */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      // 1. Grab the actual input box sitting right next to this button
-                      const input = e.currentTarget.parentNode.querySelector('.clean-qty-input');
-                      if (input) {
-                        const currentVal = parseInt(input.value, 10) || 1;
-                        const nextVal = currentVal + 1;
-                        
-                        // 2. Explicitly change its value attribute
-                        input.value = nextVal;
-                        
-                        // 3. Fire a real native browser event so your parent onChange listener wakes up
-                        const event = new Event('input', { bubbles: true });
-                        input.dispatchEvent(event);
-                      }
-                    }}
-                    style={{ 
-                      background: "none", 
-                      border: "none", 
-                      color: "#666", 
-                      width: "30px", 
-                      height: "100%", 
-                      cursor: "pointer", 
-                      fontSize: "10px", 
-                      transition: "color 0.2s, background 0.2s",
-                      padding: 0,
-                      display: "flex",          
-                      alignItems: "center",      
-                      justifyContent: "center"   
-                    }}
-                    onMouseEnter={(e) => { e.target.style.color = "#1d5c34"; e.target.style.background = "#141414"; }}
-                    onMouseLeave={(e) => { e.target.style.color = "#666"; e.target.style.background = "none"; }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label style={styles.label}>DESTINATION EMAIL</label>
-                <input 
-                  type="email" 
-                  placeholder="client@domain.com" 
-                  style={{
-                    ...styles.inputElement,
-                    borderColor: emailError ? "#ef4444" : (styles.inputElement?.borderColor || "#1a1a1a")
-                  }} 
-                  value={email} 
-                  onChange={handleEmailChange} 
-                  onBlur={handleEmailBlur}
-                />
-                {emailError && (
-                  <span style={{ color: "#ef4444", fontSize: "11px", marginTop: "4px", display: "block", letterSpacing: "0.5px" }}>
-                    {emailError}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "12px" }}>
-              <div>
-                <label style={styles.label}>FIRST NAME</label>
-                <input type="text" placeholder="John" style={styles.inputElement} value={firstname} onChange={(e) => setFirstname(e.target.value)} />
-              </div>
-              <div>
-                <label style={styles.label}>LAST NAME</label>
-                <input type="text" placeholder="Doe" style={styles.inputElement} value={lastname} onChange={(e) => setLastname(e.target.value)} />
-              </div>
-            </div>
-
-            {/* CONTACT & STREET ADDRESS INFRASTRUCTURE */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "12px" }}>
-              <div>
-                <label style={styles.label}>PHONE NUMBER</label>
-                <input 
-                  type="tel" 
-                  placeholder="+1 (555) 000-0000" 
-                  style={styles.inputElement} 
-                  value={phone} 
-                  onFocus={() => {
-                    if (!phone) setPhone("+");
-                  }}
-                  onChange={(e) => {
-                    let input = e.target.value;
-                    if (!input.startsWith("+")) input = "+" + input;
-                    const digits = input.replace(/\D/g, "");
-                    let formatted = "+";
-                    
-                    if (digits.length > 0) {
-                      const countryCode = digits.slice(0, 1); 
-                      const rest = digits.slice(1);
-                      
-                      if (rest.length === 0) {
-                        formatted = `+${countryCode}`;
-                      } else if (rest.length <= 3) {
-                        formatted = `+${countryCode} (${rest}`;
-                      } else if (rest.length <= 6) {
-                        formatted = `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3)}`;
-                      } else {
-                        formatted = `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6, 10)}`;
-                      }
-                    }
-                    setPhone(formatted);
-                  }} 
-                />
-              </div>
-              <div>
-                <label style={styles.label}>POSTAL / ZIP CODE</label>
-                <input type="text" placeholder="10001" style={styles.inputElement} value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
-              </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <label style={styles.label}>SHIPPING STREET ADDRESS</label>
-                <input type="text" placeholder="123 Global Dr, Apt 4B" style={styles.inputElement} value={address} onChange={(e) => setAddress(e.target.value)} />
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginTop: "12px" }}>
-              <div>
-                <label style={styles.label}>DEPOSIT TRANSACTION HASH (Required)</label>
-                <input type="text" placeholder="0x..." style={styles.inputElement} value={purchaseTxHash} onChange={(e) => setPurchaseTxHash(e.target.value)} />
-              </div>
-              <div>
-                <label style={styles.label}>BUYER'S WALLET ADDRESS (Required)</label>
-                <input type="text" placeholder="0x..." style={styles.inputElement} value={buyerWalletAddress} onChange={(e) => setBuyerWalletAddress(e.target.value)} />
-              </div>
-            </div>
-
-            {/* VALUATION BREAKDOWN VIEW */}
-            {selectedAssetKey && selectedPanelKey && selectedGridTieKey && selectedMonitoringKey && (
-              <div style={{ background: "#050505", padding: "12px", borderRadius: "6px", border: "1px solid #121212", marginTop: "12px", marginBottom: "16px", fontSize: "12px" }}>
-                <span style={{ color: "#888888", display: "block", marginBottom: "2px" }}>ESTIMATED ASSET BREAKDOWN:</span>
-                Base Model Price: <b style={{ color: "#ffffff" }}>${genData[selectedAssetKey].price.toString()}</b>
-                <br />
-                Customization Upcharges: <b style={{ color: "#1d5c34" }}>+${((genData[selectedAssetKey].panel[selectedPanelKey]?.price || 0n) + (genData[selectedAssetKey].gridTie[selectedGridTieKey]?.price || 0n) + (genData[selectedAssetKey].monitoring[selectedMonitoringKey]?.price || 0n)).toString()}</b>
-              </div>
+            {portalStep === 2 && userAction === "purchase" && (
+              <PurchaseStep 
+                genData={genData}
+                selectedAssetKey={selectedAssetKey}
+                setSelectedAssetKey={setSelectedAssetKey}
+                selectedPanelKey={selectedPanelKey}
+                setSelectedPanelKey={setSelectedPanelKey}
+                selectedVoltage={selectedVoltage}
+                setSelectedVoltage={setSelectedVoltage}
+                selectedFrequency={selectedFrequency}
+                setSelectedFrequency={setSelectedFrequency}
+                selectedPhase={selectedPhase}
+                setSelectedPhase={setSelectedPhase}
+                selectedReactor={selectedReactor}
+                setSelectedReactor={setSelectedReactor}
+                selectedGridTieKey={selectedGridTieKey}
+                setSelectedGridTieKey={setSelectedGridTieKey}
+                selectedMonitoringKey={selectedMonitoringKey}
+                setSelectedMonitoringKey={setSelectedMonitoringKey}
+                selectedStableTokenSymbol={selectedStableTokenSymbol}
+                setSelectedStableTokenSymbol={setSelectedStableTokenSymbol}
+                setSelectedTokenAddress={setSelectedTokenAddress}
+                buyerWalletAddress={buyerWalletAddress}
+                setBuyerWalletAddress={setBuyerWalletAddress}
+                quantity={quantity}
+                setSelectedQuantity={setSelectedQuantity}
+                email={email}
+                handleEmailChange={handleEmailChange}
+                handleEmailBlur={handleEmailBlur}
+                emailError={emailError}
+                firstname={firstname}
+                setFirstname={setFirstname}
+                lastname={lastname}
+                setLastname={setLastname}
+                address={address}
+                setAddress={setAddress}
+                city={city}
+                setCity={setCity}
+                state={state}
+                setState={setState}
+                phone={phone}
+                setPhone={(e) => setPhone(e.target.value)} // Custom structural input assignment format
+                postalCode={postalCode}
+                setPostalCode={setPostalCode}
+                selectedCountryKey={selectedCountryKey}
+                setSelectedCountryKey={setSelectedCountryKey}
+                purchaseTxHash={purchaseTxHash}
+                setPurchaseTxHash={setPurchaseTxHash}
+                onPrevious={() => setPortalStep(1)}
+                handlePurchase={(e) => {
+                  handlePurchase(e);
+                  setIsPurchaseModalOpen(false);
+                  setPortalStep(1);
+                }}
+                onHelpToggle={() => console.log("Display Purchase Help Menu")}
+                onClose={() => setIsPurchaseModalOpen(false)}
+              />
+            )}
+            
+            {/* HARDWARE MAINTENANCE DIAGNOSTICS LOG STEP */}
+            {portalStep === 3 && userAction === "repair" && (
+              <RepairStep 
+                receipt={purchaseTxHash}
+                setReceipt={setPurchaseTxHash}
+                firstname={firstname}
+                setFirstname={setFirstname}
+                lastname={lastname}
+                setLastname={setLastname}
+                email={email}
+                handleEmailChange={handleEmailChange}
+                handleEmailBlur={handleEmailBlur}
+                emailError={emailError}
+                onPrevious={() => setPortalStep(1)}
+                onNext={async () => {
+                  console.log("Submitting hardware repair manifest payloads...");
+                  await handleProcessReturn("repair");
+                }}
+                isProcessing={isActionProcessing}
+                isValidHash={purchaseTxHash && purchaseTxHash.startsWith("0x")}
+                userAddress={userAddress}
+                isConnected={isConnected}
+                onHelpToggle={() => console.log("Repair instructions module text")}
+                onClose={() => setIsPurchaseModalOpen(false)}
+              />
             )}
 
-            <button 
-              style={{ ...styles.btnForestGreen, width: "100%", marginTop: "8px", padding: "14px" }} 
-              onClick={(e) => {
-                handlePurchase(e);
-                setIsPurchaseModalOpen(false); // Clean exit option on execution completion
-              }}
-            >
-              SUBMIT PURCHASE ORDER
-            </button>
+            {/* FINANCIAL LEDGER RETURN SETTLEMENT STEP */}
+            {portalStep === 4 && userAction === "refund" && (
+              <RefundStep 
+                receipt={purchaseTxHash}
+                setReceipt={setPurchaseTxHash}
+                firstname={firstname}
+                setFirstname={setFirstname}
+                lastname={lastname}
+                setLastname={setLastname}
+                email={email}
+                handleEmailChange={handleEmailChange}
+                handleEmailBlur={handleEmailBlur}
+                emailError={emailError}
+                onPrevious={() => setPortalStep(1)}
+                onNext={async () => {
+                  console.log("Submitting hardware repair manifest payloads...");
+                  await handleProcessReturn("repair");
+                }}
+                isProcessing={isActionProcessing}
+                isValidHash={purchaseTxHash && purchaseTxHash.startsWith("0x")}
+                userAddress={userAddress}
+                isConnected={isConnected}
+                onHelpToggle={() => console.log("Refund parameters criteria terms text")}
+                onClose={() => setIsPurchaseModalOpen(false)}
+              />
+            )}
           </div>
         </div>
       )}
