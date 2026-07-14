@@ -16,6 +16,7 @@ import AffiliatePortal from "./components/coreAffiliate.jsx";
 import GlobalSwapPortal from "./components/coreSwap.jsx";
 import NativeExchangeHistory from "./components/coreNative.jsx";
 import Sidebar from './components/sideBar';
+import CoreRateBanner from './components/rateBanner.jsx'
 import { useRpcStatus } from "./utils/statusRpc";
 import { styles } from './utils/styles.jsx';
 import './global.css';
@@ -719,7 +720,7 @@ export default function AdminDashboard() {
             // Preserves your strict arithmetic conversion calculation
             const calculatedRate = (tokenRate / parsedGbdo).toFixed(4);
             // Result example: $3000.00 WETH/GBDo
-            return `$${Number(calculatedRate).toFixed(2)} ${symbol}/GBDo`;
+            return `$${Number(calculatedRate).toFixed(2)} ${symbol}|GBDo`;
           });
 
           setRatesPool(formattedArray);
@@ -827,6 +828,12 @@ export default function AdminDashboard() {
 
     {/* DYNAMIC WORKSPACE PORTAL CONTAINER */}
     <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100vh", overflowY: "auto", background: "#050505" }}>
+      
+     {/* 1. TRUE TOP BANNER (LIFTED HERE) */}
+      <CoreRateBanner />
+
+      {/* Scrollable interior wrapper to keep the banner fixed on top */}
+      <div style={{ flex: 1, overflowY: "auto", width: "100%" }}>
 
       {/* MASTER DEFAULT LANDING: SYSTEM OPERATIONS HUB */}
       {(!portalView || portalView === 'hub') && (
@@ -1176,7 +1183,7 @@ export default function AdminDashboard() {
           isConnected={isConnected} 
         />
       )}
-
+    </div>
     </div>
   </div>
 )};
